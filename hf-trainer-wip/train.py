@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn.functional as F
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
@@ -11,6 +12,9 @@ import gc
 from dam import DAMLayer
 from utils import find_all_linear_names
 
+os.environ['HF_TOKEN'] = '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'
+os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
+
 # Model IDs
 MODEL_ID = "mistralai/Mistral-7B-v0.1"
 MODEL_ID_A = "augmxnt/shisa-gamma-7b-v1"
@@ -23,6 +27,8 @@ model_A = AutoModelForCausalLM.from_pretrained(MODEL_ID_A, torch_dtype=torch.bfl
 model_B = AutoModelForCausalLM.from_pretrained(MODEL_ID_B, torch_dtype=torch.bfloat16, device_map="auto")
 model_C = AutoModelForCausalLM.from_pretrained(MODEL_ID_C, torch_dtype=torch.bfloat16, device_map="auto")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, use_fast=True)
+
+exit("==")
 
 # Prepare DAM layers
 modules = find_all_linear_names(base_model)
