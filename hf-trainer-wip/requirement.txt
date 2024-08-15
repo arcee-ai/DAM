@@ -1,0 +1,7 @@
+torch>=2.0.0
+transformers>=4.30.0
+datasets>=2.10.0
+bitsandbytes>=0.39.0
+tqdm>=4.64.0
+matplotlib>=3.5.0
+glom>=20.11.0
