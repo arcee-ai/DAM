@@ -1,8 +1,3 @@
-Here's how you can create a `README.md` and a `requirements.txt` file for your project.
-
-### `README.md`
-
-```markdown
 # Differentiable Adaptive Merging (DAM) for Large Language Models
 
 This repository contains the implementation of the Differentiable Adaptive Merging (DAM) technique, a novel method for efficiently merging large language models (LLMs) with varying capabilities. This approach optimizes the integration process by learning the optimal balance between models, reducing computational costs, and improving the quality of the merged models.
