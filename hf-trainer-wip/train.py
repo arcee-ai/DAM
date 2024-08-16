@@ -14,6 +14,7 @@ from utils import find_all_linear_names
 
 os.environ['HF_TOKEN'] = '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'
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
+os.environ['HF_HOME'] = '/workspace/.hf'
 
 # Model IDs
 MODEL_ID = "mistralai/Mistral-7B-v0.1"
@@ -28,24 +29,30 @@ model_B = AutoModelForCausalLM.from_pretrained(MODEL_ID_B, torch_dtype=torch.bfl
 model_C = AutoModelForCausalLM.from_pretrained(MODEL_ID_C, torch_dtype=torch.bfloat16, device_map="auto")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, use_fast=True)
 
-exit("==")
-
 # Prepare DAM layers
+# This list will be used later to apply the DAM (Dynamic Alignment Merger) layers
 modules = find_all_linear_names(base_model)
 
-truncated_layer = nn.Linear(in_features=4096, out_features=32000, bias=False)
+truncated_layer = torch.nn.Linear(in_features=4096, out_features=32000, bias=False)
+
+# Initializes the truncated_layer with a subset of the weights from model_C
 with torch.no_grad():
     truncated_layer.weight.data = model_C.lm_head.weight.data[:32000, :]
 
 assign = Assign('lm_head', truncated_layer)
+# The glom function applies the assign operation to model_C, 
+# replacing its lm_head with the truncated_layer. This effectively modifies model_C by substituting part of its original architecture with the new truncated layer.
 glom(model_C, assign)
 
 for m in tqdm(modules):
+    # we access corresponding linear layers from all the models
     base_linear = glom(base_model, m)
     linear_a = glom(model_A, m)
     linear_b = glom(model_B, m)
     linear_c = glom(model_C, m)
 
+    # This layer is designed to merge multiple linear layers (base_linear, linear_a, linear_b, and linear_c)
+    # from different models during training, allowing the model to learn an optimal combination of these layers.
     dam_layer = DAMLayer(
         base_linear=base_linear,
         linear_a=linear_a,
@@ -58,6 +65,7 @@ for m in tqdm(modules):
         dtype=linear_a.weight.dtype
     )
 
+    # Replace the linear layer m in base_model with the newly created DAMLayer.
     assign = Assign(m, dam_layer)
     glom(base_model, assign)
 
