@@ -44,6 +44,9 @@ assign = Assign('lm_head', truncated_layer)
 # replacing its lm_head with the truncated_layer. This effectively modifies model_C by substituting part of its original architecture with the new truncated layer.
 glom(model_C, assign)
 
+# he code aims to modify the linear layers in the base_model by replacing them with a custom layer called DAMLayer. This DAMLayer allows the model to 
+#dynamically merge the linear layers from the base_model with corresponding layers from three other models (model_A, model_B, model_C) during training.
+
 for m in tqdm(modules):
     # we access corresponding linear layers from all the models
     base_linear = glom(base_model, m)
@@ -71,72 +74,98 @@ for m in tqdm(modules):
 
 # Define the DAM loss computation
 def compute_dam_loss_for_lm(model, prompt_a, prompt_b, prompt_c, lambda_coef=0.01, temperature=2.0):
+    # Tokenize the three input prompts (prompt_a, prompt_b, prompt_c) with padding and truncation to ensure consistent input sizes.
+    # The output is returned as PyTorch tensors.
     batch = tokenizer([prompt_a, prompt_b, prompt_c], padding="max_length", truncation=True, max_length=4096, return_tensors='pt')
 
+    # Move the input IDs and attention masks to the same device as the model (e.g., GPU).
     input_ids = batch["input_ids"].to(model.device)
     attention_mask = batch["attention_mask"].to(model.device)
 
+    # Separate the tokenized input IDs for each prompt.
     input_a = input_ids[0].to(model.device)
     input_b = input_ids[1].to(model.device)
     input_c = input_ids[2].to(model.device)
 
+    # Clone the input IDs to use as labels, then set the positions corresponding to padding (indicated by attention mask) to -100.
+    # This ensures that padding tokens are ignored in the loss computation.
     labels = batch["input_ids"].clone()
     labels[attention_mask == 0] = -100
 
+    # Separate the labels for each input.
     labels_a = labels[0].to(model.device)
     labels_b = labels[1].to(model.device)
     labels_c = labels[2].to(model.device)
 
+    # Disable gradient computation for the initial forward passes to obtain the original logits.
     with torch.no_grad():
+        # Set the forward type to 'weight_1', so only the base weights combined with the task vector from linear_a are used.
         for module in model.modules():
             if isinstance(module, DAMLayer):
                 module.set_forward_type('weight_1')
+        # Compute the original logits for input_a with this configuration.
         original_logits_a = model(input_ids=input_a.unsqueeze(0), labels=labels_a.unsqueeze(0)).logits
 
+        # Set the forward type to 'weight_2', so only the base weights combined with the task vector from linear_b are used.
         for module in model.modules():
             if isinstance(module, DAMLayer):
                 module.set_forward_type('weight_2')
+        # Compute the original logits for input_b with this configuration.
         original_logits_b = model(input_ids=input_b.unsqueeze(0), labels=labels_b.unsqueeze(0)).logits
 
+        # Set the forward type to 'weight_3', so only the base weights combined with the task vector from linear_c are used.
         for module in model.modules():
             if isinstance(module, DAMLayer):
                 module.set_forward_type('weight_3')
+        # Compute the original logits for input_c with this configuration.
         original_logits_c = model(input_ids=input_c.unsqueeze(0), labels=labels_c.unsqueeze(0)).logits
 
+    # Reset the DAMLayer to 'merge' mode, so the model will now combine the base weights with all task vectors.
     for module in model.modules():
         if isinstance(module, DAMLayer):
             module.set_forward_type('merge')   
 
+    # Compute the logits again, but this time using the merged weights from all task vectors.
     merged_logits_a = model(input_ids=input_a.unsqueeze(0), labels=labels_a.unsqueeze(0)).logits
     merged_logits_b = model(input_ids=input_b.unsqueeze(0), labels=labels_b.unsqueeze(0)).logits
     merged_logits_c = model(input_ids=input_c.unsqueeze(0), labels=labels_c.unsqueeze(0)).logits
 
+    # Compute the KL divergence loss between the merged logits and the original logits for input_a.
+    # The logits are scaled by the temperature before applying softmax and log-softmax.
+    # The result is normalized by the input length.
     loss_a = F.kl_div(
         F.log_softmax(merged_logits_a / temperature, dim=-1),
         F.softmax(original_logits_a / temperature, dim=-1),
         reduction='batchmean'
     ) * (temperature ** 2) / len(input_a)
     
+    # Compute the KL divergence loss between the merged logits and the original logits for input_b.
     loss_b = F.kl_div(
         F.log_softmax(merged_logits_b / temperature, dim=-1),
         F.softmax(original_logits_b / temperature, dim=-1),
         reduction='batchmean'
     ) * (temperature ** 2) / len(input_b)
     
+    # Compute the KL divergence loss between the merged logits and the original logits for input_c.
     loss_c = F.kl_div(
         F.log_softmax(merged_logits_c / temperature, dim=-1),
         F.softmax(original_logits_c / temperature, dim=-1),
         reduction='batchmean'
     ) * (temperature ** 2) / len(input_c)
     
+    # Initialize the similarity loss to zero.
     similarity_loss = torch.tensor(0.0)
+    # Compute the cosine similarity between the merging coefficients across all DAMLayer instances in the base model.
     for module in base_model.modules():
         if isinstance(module, DAMLayer):
             similarity_loss += module.compute_mergers_similarity().to(similarity_loss.device)
     
+    # Compute the total loss as the sum of the KL divergence losses and the similarity loss, scaled by lambda_coef.
     total_loss = loss_a + loss_b + loss_c + lambda_coef * similarity_loss
 
+    # Return the total loss to be used for backpropagation during training.
     return total_loss
+
 
 # Training loop
 tokenizer.pad_token = tokenizer.eos_token
@@ -148,6 +177,10 @@ plt.title("Training Loss")
 plt.xlabel("Iteration")
 plt.ylabel("Loss")
 losses = []
+
+print(base_model)
+
+exit()
 
 for epoch in range(num_epochs):
     base_model.train()
