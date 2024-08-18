@@ -1,18 +1,27 @@
 import torch
 import bitsandbytes as bnb
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoConfig, AutoTokenizer
+from peft.tuners.lora import QuantLinear
 
-def get_linear_embedding_layers(model_type):
-    if model_type == "gpt_neox":
-        return ["embed_in", "embed_out"]
-    if model_type == "falcon":
-        return ["word_embeddings", "lm_head"]
-    return ["embed_tokens", "lm_head"]
-
-def find_all_linear_names(model):
-    cls = (bnb.nn.Linear4bit, bnb.nn.Linear8bitLt, torch.nn.Linear)
+def find_embedding_layers(model):
+    """
+    Finds all embedding layers in the model.
+    """
+    cls = torch.nn.Embedding
     names = []
     for name, module in model.named_modules():
-        if isinstance(module, cls) or "Linear" in module.__class__.__name__:
+        if isinstance(module, cls):
+            names.append(name)
+    return names
+
+def find_all_linear_names(model):
+    """
+    Finds all linear layers in the model, including standard linear layers, quantized layers, 
+    and custom layers like QuantLinear.
+    """
+    cls = (bnb.nn.Linear4bit, bnb.nn.Linear8bitLt, torch.nn.Linear, QuantLinear)
+    names = []
+    for name, module in model.named_modules():
+        if isinstance(module, cls):
             names.append(name)
     return names
