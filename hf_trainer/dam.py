@@ -8,16 +8,15 @@ from transformers import AutoModelForCausalLM
 class DAMBaseLayer(nn.Module):
     """
     Base class for DAM (Dynamic Alignment Merger) layers, which handles common functionality for both linear 
-    and embedding layers. It merges layers from a base model and three other models using fixed task vectors 
-    (differences from base weights). The trainable merging coefficients control how these task vectors 
-    are weighted and combined during training.
+    and embedding layers. It merges layers from a base model and three other models using fixed weights 
+    provided for each model. The trainable merging coefficients control how these weights are combined during training.
     """
     def __init__(
         self,
         base_weight: Tensor,
-        weight_1: Tensor,
-        weight_2: Tensor,
-        weight_3: Tensor,
+        weight_1: Optional[Tensor] = None,
+        weight_2: Optional[Tensor] = None,
+        weight_3: Optional[Tensor] = None,
         init_merger_value: Optional[float] = 0.33,
         init_merger_value_2: Optional[float] = 0.33,
         init_merger_value_3: Optional[float] = 0.33,
@@ -25,17 +24,15 @@ class DAMBaseLayer(nn.Module):
     ):
         super().__init__()
 
-        # The weights of the base layer are cloned and registered as buffers.
         self.register_buffer('base_weight', base_weight.clone())
-        self.register_buffer('task_vector_1', weight_1 - self.base_weight)
-        self.register_buffer('task_vector_2', weight_2 - self.base_weight)
-        self.register_buffer('task_vector_3', weight_3 - self.base_weight)
 
-        # self.register_buffer('weight_1', weight_1)
-        # self.register_buffer('weight_2', weight_2)
-        # self.register_buffer('weight_3', weight_3)
+        if weight_1 is not None and weight_2 is not None and weight_3 is not None:
+            self.register_buffer('weight_1', weight_1)
+            self.register_buffer('weight_2', weight_2)
+            self.register_buffer('weight_3', weight_3)
+        else:
+            raise ValueError("Weights must be provided for weight_1, weight_2, and weight_3.")
 
-        # The merger parameters are learnable parameters that control the weighting of the task vectors.
         self.merger_1 = Parameter(
             torch.ones(weight_1.size(0), device=weight_1.device, dtype=dtype) * init_merger_value
         )
@@ -73,11 +70,11 @@ class DAMBaseLayer(nn.Module):
         self.merger_2.requires_grad = True
         self.merger_3.requires_grad = True
 
+
 class DAMLinearLayer(DAMBaseLayer):
     """
-    DAMLinearLayer merges linear layers from a base model and three other models using fixed task vectors 
-    (differences from base weights). The trainable merging coefficients control how these task vectors 
-    are weighted and combined during training.
+    DAMLinearLayer merges linear layers from a base model and three other models using fixed weights provided 
+    for each model. The trainable merging coefficients control how these weights are combined during training.
     """
     def __init__(
         self,
@@ -104,40 +101,24 @@ class DAMLinearLayer(DAMBaseLayer):
 
         if all(linear.bias is not None for linear in [base_linear, linear_a, linear_b, linear_c]):
             self.register_buffer('base_bias', base_linear.bias.data.clone())
-            self.register_buffer('bias_task_vector_1', linear_a.bias.data - self.base_bias)
-            self.register_buffer('bias_task_vector_2', linear_b.bias.data - self.base_bias)
-            self.register_buffer('bias_task_vector_3', linear_c.bias.data - self.base_bias)
             self.bias_merger1 = nn.Parameter(torch.ones(1, device=linear_a.bias.data.device, dtype=dtype) * init_merger_value)
             self.bias_merger2 = nn.Parameter(torch.ones(1, device=linear_b.bias.data.device, dtype=dtype) * init_merger_value_2)
             self.bias_merger3 = nn.Parameter(torch.ones(1, device=linear_c.bias.data.device, dtype=dtype) * init_merger_value_3)
         else:
             self.register_buffer('base_bias', None)
-            self.register_buffer('bias_task_vector_1', None)
-            self.register_buffer('bias_task_vector_2', None)
-            self.register_buffer('bias_task_vector_3', None)
             self.register_parameter('bias_merger1', None)
             self.register_parameter('bias_merger2', None)
             self.register_parameter('bias_merger3', None)
 
-    # def get_dam_weight(self):
-    #     if self.base_weight.shape != self.task_vector_1.shape:
-    #             raise ValueError(f"Shape mismatch: base_weight {self.base_weight.shape}, task_vector_1 {self.task_vector_1.shape}")
-    #     print(self.base_weight.shape, self.merger_1.shape, self.task_vector_1.shape, self.merger_2.shape, self.task_vector_2.shape, self.merger_3.shape, self.task_vector_3.shape)
-    #     return self.base_weight + self.merger_1 * self.task_vector_1 + self.merger_2 * self.task_vector_2 + self.merger_3 * self.task_vector_3
-
     def get_dam_weight(self):
-        # Adjust the shape of merger parameters by unsqueezing to match the task vector dimensions
-        merger_1_expanded = self.merger_1.unsqueeze(1)  # Shape: (1024, 1)
-        merger_2_expanded = self.merger_2.unsqueeze(1)  # Shape: (1024, 1)
-        merger_3_expanded = self.merger_3.unsqueeze(1)  # Shape: (1024, 1)
-        
-        # Perform element-wise multiplication, which will broadcast the merger parameters across the second dimension
-        return self.base_weight + merger_1_expanded * self.task_vector_1 + merger_2_expanded * self.task_vector_2 + merger_3_expanded * self.task_vector_3
+        merger_1_expanded = self.merger_1.unsqueeze(1)  # Shape: (feature_dim, 1)
+        merger_2_expanded = self.merger_2.unsqueeze(1)  # Shape: (feature_dim, 1)
+        merger_3_expanded = self.merger_3.unsqueeze(1)  # Shape: (feature_dim, 1)
+        return self.base_weight + merger_1_expanded * self.weight_1 + merger_2_expanded * self.weight_2 + merger_3_expanded * self.weight_3
 
-    
     def get_dam_bias(self):
         if self.base_bias is not None:
-            return self.base_bias + self.bias_merger1 * self.bias_task_vector_1 + self.bias_merger2 * self.bias_task_vector_2 + self.bias_merger3 * self.bias_task_vector_3
+            return self.base_bias + self.bias_merger1 + self.bias_merger2 + self.bias_merger3
         return None
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
@@ -151,14 +132,14 @@ class DAMLinearLayer(DAMBaseLayer):
             weight = self.base_weight
             bias = self.base_bias
         elif self.forward_type == "weight_1":
-            weight = self.base_weight + self.task_vector_1
-            bias = self.base_bias + self.bias_task_vector_1 if self.base_bias is not None else None
+            weight = self.weight_1  # Use the weight_1 directly without task vectors
+            bias = self.base_bias if self.base_bias is not None else None
         elif self.forward_type == "weight_2":
-            weight = self.base_weight + self.task_vector_2
-            bias = self.base_bias + self.bias_task_vector_2 if self.base_bias is not None else None
+            weight = self.weight_2  # Use the weight_2 directly without task vectors
+            bias = self.base_bias if self.base_bias is not None else None
         elif self.forward_type == "weight_3":
-            weight = self.base_weight + self.task_vector_3
-            bias = self.base_bias + self.bias_task_vector_3 if self.base_bias is not None else None
+            weight = self.weight_3  # Use the weight_3 directly without task vectors
+            bias = self.base_bias if self.base_bias is not None else None
         else:
             raise ValueError(self.forward_type)
 
@@ -168,9 +149,8 @@ class DAMLinearLayer(DAMBaseLayer):
 
 class DAMEmbeddingLayer(DAMBaseLayer):
     """
-    DAMEmbeddingLayer merges embedding layers from a base model and three other models using fixed task vectors 
-    (differences from base embeddings). The trainable merging coefficients control how these task vectors 
-    are weighted and combined during training.
+    DAMEmbeddingLayer merges embedding layers from a base model and three other models using fixed weights 
+    provided for each model. The trainable merging coefficients control how these weights are combined during training.
     """
     def __init__(
         self,
@@ -201,7 +181,7 @@ class DAMEmbeddingLayer(DAMBaseLayer):
         self.sparse = embedding_a.sparse
 
     def get_dam_embedding_weight(self):
-        return self.base_weight + self.merger_1.unsqueeze(1) * self.task_vector_1 + self.merger_2.unsqueeze(1) * self.task_vector_2 + self.merger_3.unsqueeze(1) * self.task_vector_3
+        return self.base_weight + self.merger_1.unsqueeze(1) * self.weight_1 + self.merger_2.unsqueeze(1) * self.weight_2 + self.merger_3.unsqueeze(1) * self.weight_3
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         if self.forward_type == "merge":
@@ -209,11 +189,11 @@ class DAMEmbeddingLayer(DAMBaseLayer):
         elif self.forward_type == "base":
             weight = self.base_weight
         elif self.forward_type == "weight_1":
-            weight = self.base_weight + self.task_vector_1
+            weight = self.weight_1  # Use the weight_1 directly without task vectors
         elif self.forward_type == "weight_2":
-            weight = self.base_weight + self.task_vector_2
+            weight = self.weight_2  # Use the weight_2 directly without task vectors
         elif self.forward_type == "weight_3":
-            weight = self.base_weight + self.task_vector_3
+            weight = self.weight_3  # Use the weight_3 directly without task vectors
         else:
             raise ValueError(self.forward_type)
 
