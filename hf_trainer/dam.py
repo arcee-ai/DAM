@@ -13,49 +13,52 @@ class DAMBaseLayer(nn.Module):
     """
     def __init__(
         self,
-        base_weight: Tensor,
-        weight_1: Optional[Tensor] = None,
-        weight_2: Optional[Tensor] = None,
-        weight_3: Optional[Tensor] = None,
+        weight_1: Tensor,
+        weight_2: Tensor,
+        weight_3: Tensor,
         init_merger_value: Optional[float] = 0.33,
         init_merger_value_2: Optional[float] = 0.33,
         init_merger_value_3: Optional[float] = 0.33,
         dtype: Optional[torch.dtype] = None,
     ):
         super().__init__()
+        
+        self.register_buffer('weight_1', weight_1)
+        self.register_buffer('weight_2', weight_2)
+        self.register_buffer('weight_3', weight_3)
 
-        self.register_buffer('base_weight', base_weight.clone())
-
-        if weight_1 is not None and weight_2 is not None and weight_3 is not None:
-            self.register_buffer('weight_1', weight_1)
-            self.register_buffer('weight_2', weight_2)
-            self.register_buffer('weight_3', weight_3)
-        else:
-            raise ValueError("Weights must be provided for weight_1, weight_2, and weight_3.")
-
+        # The merger parameters are learnable parameters that control the weighting of the task vectors.
         self.merger_1 = Parameter(
-            torch.ones(weight_1.size(0), device=weight_1.device, dtype=dtype) * init_merger_value
+            torch.ones(weight_1.size(1), device=weight_1.device, dtype=dtype) * init_merger_value
         )
         self.merger_2 = Parameter(
-            torch.ones(weight_2.size(0), device=weight_2.device, dtype=dtype) * init_merger_value_2
+            torch.ones(weight_2.size(1), device=weight_2.device, dtype=dtype) * init_merger_value_2
         )
         self.merger_3 = Parameter(
-            torch.ones(weight_3.size(0), device=weight_3.device, dtype=dtype) * init_merger_value_3
+            torch.ones(weight_3.size(1), device=weight_3.device, dtype=dtype) * init_merger_value_3
         )
 
         self.forward_type = "merge"
 
     def set_forward_type(self, type: str = "merge"):
-        assert type in ["merge", "base", "weight_1", "weight_2", "weight_3"]
+        assert type in ["merge", "weight_1", "weight_2", "weight_3"]
         self.forward_type = type
 
-    def compute_mergers_similarity(self, lambda_coef_reg=None):
-        sim_12 = F.cosine_similarity(self.merger_1, self.merger_2, dim=0)
-        sim_13 = F.cosine_similarity(self.merger_1, self.merger_3, dim=0)
-        sim_23 = F.cosine_similarity(self.merger_2, self.merger_3, dim=0)
-        similarity_loss = (sim_12 + sim_13 + sim_23) / 3
+    def compute_mergers_similarity(self, lambda_coef=None):
+        similarity_loss = torch.tensor(0.0)
 
-        l2_reg = 0.0
+        if lambda_coef is not None:
+            sim_12 = F.cosine_similarity(self.merger_1, self.merger_2, dim=0)
+            sim_13 = F.cosine_similarity(self.merger_1, self.merger_3, dim=0)
+            sim_23 = F.cosine_similarity(self.merger_2, self.merger_3, dim=0)
+            
+            similarity_loss = (sim_12 + sim_13 + sim_23) / 3
+            similarity_loss *= lambda_coef
+
+        return similarity_loss
+
+    def compute_mergers_L2_reg(self, lambda_coef_reg=None):
+        l2_reg = torch.tensor(0.0)
         if lambda_coef_reg is not None:
             l2_reg = (
                 self.merger_1.norm(2) +
@@ -63,13 +66,12 @@ class DAMBaseLayer(nn.Module):
                 self.merger_3.norm(2)
             ) * lambda_coef_reg
 
-        return similarity_loss + l2_reg
+        return l2_reg
 
     def unfreeze(self):
         self.merger_1.requires_grad = True
         self.merger_2.requires_grad = True
         self.merger_3.requires_grad = True
-
 
 class DAMLinearLayer(DAMBaseLayer):
     """
@@ -78,7 +80,6 @@ class DAMLinearLayer(DAMBaseLayer):
     """
     def __init__(
         self,
-        base_linear: nn.Linear,
         linear_a: nn.Linear,
         linear_b: nn.Linear,
         linear_c: nn.Linear,
@@ -89,7 +90,6 @@ class DAMLinearLayer(DAMBaseLayer):
         dtype: Optional[torch.dtype] = None,
     ):
         super().__init__(
-            base_weight=base_linear.weight.data,
             weight_1=linear_a.weight.data,
             weight_2=linear_b.weight.data,
             weight_3=linear_c.weight.data,
@@ -99,51 +99,50 @@ class DAMLinearLayer(DAMBaseLayer):
             dtype=dtype
         )
 
-        if all(linear.bias is not None for linear in [base_linear, linear_a, linear_b, linear_c]):
-            self.register_buffer('base_bias', base_linear.bias.data.clone())
+        if all(linear.bias is not None for linear in [linear_a, linear_b, linear_c]):
+            self.register_buffer('bias_1', linear_a.bias.data)
+            self.register_buffer('bias_2', linear_b.bias.data)
+            self.register_buffer('bias_3', linear_c.bias.data)
             self.bias_merger1 = nn.Parameter(torch.ones(1, device=linear_a.bias.data.device, dtype=dtype) * init_merger_value)
             self.bias_merger2 = nn.Parameter(torch.ones(1, device=linear_b.bias.data.device, dtype=dtype) * init_merger_value_2)
             self.bias_merger3 = nn.Parameter(torch.ones(1, device=linear_c.bias.data.device, dtype=dtype) * init_merger_value_3)
         else:
-            self.register_buffer('base_bias', None)
+            self.register_buffer('bias_1', None)
+            self.register_buffer('bias_2', None)
+            self.register_buffer('bias_3', None)
             self.register_parameter('bias_merger1', None)
             self.register_parameter('bias_merger2', None)
             self.register_parameter('bias_merger3', None)
 
     def get_dam_weight(self):
-        merger_1_expanded = self.merger_1.unsqueeze(1)  # Shape: (feature_dim, 1)
-        merger_2_expanded = self.merger_2.unsqueeze(1)  # Shape: (feature_dim, 1)
-        merger_3_expanded = self.merger_3.unsqueeze(1)  # Shape: (feature_dim, 1)
-        return self.base_weight + merger_1_expanded * self.weight_1 + merger_2_expanded * self.weight_2 + merger_3_expanded * self.weight_3
-
+        return self.merger_1 * self.weight_1 + self.merger_2 * self.weight_2 + self.merger_3 * self.weight_3
+    
     def get_dam_bias(self):
-        if self.base_bias is not None:
-            return self.base_bias + self.bias_merger1 + self.bias_merger2 + self.bias_merger3
+        if self.bias_1 is not None:
+            return self.bias_merger1 * self.bias_1 + self.bias_merger2 * self.bias_2 + self.bias_merger3 * self.bias_3
         return None
+    
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         orig_dtype = hidden_states.dtype
-        dtype = self.base_weight.dtype
+        dtype = self.weight_1.dtype
 
         if self.forward_type == "merge":
             weight = self.get_dam_weight()
             bias = self.get_dam_bias()
-        elif self.forward_type == "base":
-            weight = self.base_weight
-            bias = self.base_bias
         elif self.forward_type == "weight_1":
-            weight = self.weight_1  # Use the weight_1 directly without task vectors
-            bias = self.base_bias if self.base_bias is not None else None
+            weight = self.weight_1
+            bias = self.bias_1
         elif self.forward_type == "weight_2":
-            weight = self.weight_2  # Use the weight_2 directly without task vectors
-            bias = self.base_bias if self.base_bias is not None else None
+            weight = self.weight_2
+            bias = self.bias_2
         elif self.forward_type == "weight_3":
-            weight = self.weight_3  # Use the weight_3 directly without task vectors
-            bias = self.base_bias if self.base_bias is not None else None
+            weight = self.weight_3
+            bias = self.bias_3
         else:
             raise ValueError(self.forward_type)
 
-        hidden_states = F.linear(hidden_states.to(dtype), weight=weight, bias=bias)
+        hidden_states = F.linear(hidden_states.to(dtype).to(weight.device), weight=weight, bias=bias)
         return hidden_states.to(orig_dtype)
 
 
@@ -164,9 +163,8 @@ class DAMEmbeddingLayer(DAMBaseLayer):
         dtype: Optional[torch.dtype] = None,
     ):
         super().__init__(
-            base_weight=embedding_a.weight.data,
-            weight_1=embedding_b.weight.data,
-            weight_2=embedding_c.weight.data,
+            weight_1=embedding_a.weight.data,
+            weight_2=embedding_b.weight.data,
             weight_3=embedding_c.weight.data,
             init_merger_value=init_merger_value,
             init_merger_value_2=init_merger_value_2,
@@ -181,19 +179,17 @@ class DAMEmbeddingLayer(DAMBaseLayer):
         self.sparse = embedding_a.sparse
 
     def get_dam_embedding_weight(self):
-        return self.base_weight + self.merger_1.unsqueeze(1) * self.weight_1 + self.merger_2.unsqueeze(1) * self.weight_2 + self.merger_3.unsqueeze(1) * self.weight_3
+        return self.merger_1 * self.weight_1 + self.merger_2 * self.weight_2 + self.merger_3 * self.weight_3
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         if self.forward_type == "merge":
             weight = self.get_dam_embedding_weight()
-        elif self.forward_type == "base":
-            weight = self.base_weight
         elif self.forward_type == "weight_1":
-            weight = self.weight_1  # Use the weight_1 directly without task vectors
+            weight = self.weight_1
         elif self.forward_type == "weight_2":
-            weight = self.weight_2  # Use the weight_2 directly without task vectors
+            weight = self.weight_2
         elif self.forward_type == "weight_3":
-            weight = self.weight_3  # Use the weight_3 directly without task vectors
+            weight = self.weight_3
         else:
             raise ValueError(self.forward_type)
 
