@@ -126,6 +126,7 @@ def compute_dam_loss_for_lm(model, prompt_a, prompt_b, prompt_c, lambda_coef=0.0
             if isinstance(module, (DAMLinearLayer, DAMEmbeddingLayer)):
                 module.set_forward_type('weight_3')
         original_logits_c = model(input_ids=input_c.unsqueeze(0), labels=labels_c.unsqueeze(0)).logits
+    
 
     for module in model.modules():
         if isinstance(module, (DAMLinearLayer, DAMEmbeddingLayer)):
@@ -210,6 +211,9 @@ for epoch in range(num_epochs):
     
     for i, (prompt_a, prompt_b, prompt_c) in enumerate(progress_bar):
         loss = compute_dam_loss_for_lm(base_model, prompt_a, prompt_b, prompt_c, lambda_coef=0.01, lambda_coef_reg=0.01)
+
+        print(loss)
+        exit()
 
         loss.backward()
         

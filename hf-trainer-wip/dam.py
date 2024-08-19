@@ -31,6 +31,10 @@ class DAMBaseLayer(nn.Module):
         self.register_buffer('task_vector_2', weight_2 - self.base_weight)
         self.register_buffer('task_vector_3', weight_3 - self.base_weight)
 
+        # self.register_buffer('weight_1', weight_1)
+        # self.register_buffer('weight_2', weight_2)
+        # self.register_buffer('weight_3', weight_3)
+
         # The merger parameters are learnable parameters that control the weighting of the task vectors.
         self.merger_1 = Parameter(
             torch.ones(weight_1.size(0), device=weight_1.device, dtype=dtype) * init_merger_value
@@ -115,8 +119,21 @@ class DAMLinearLayer(DAMBaseLayer):
             self.register_parameter('bias_merger2', None)
             self.register_parameter('bias_merger3', None)
 
+    # def get_dam_weight(self):
+    #     if self.base_weight.shape != self.task_vector_1.shape:
+    #             raise ValueError(f"Shape mismatch: base_weight {self.base_weight.shape}, task_vector_1 {self.task_vector_1.shape}")
+    #     print(self.base_weight.shape, self.merger_1.shape, self.task_vector_1.shape, self.merger_2.shape, self.task_vector_2.shape, self.merger_3.shape, self.task_vector_3.shape)
+    #     return self.base_weight + self.merger_1 * self.task_vector_1 + self.merger_2 * self.task_vector_2 + self.merger_3 * self.task_vector_3
+
     def get_dam_weight(self):
-        return self.base_weight + self.merger_1 * self.task_vector_1 + self.merger_2 * self.task_vector_2 + self.merger_3 * self.task_vector_3
+        # Adjust the shape of merger parameters by unsqueezing to match the task vector dimensions
+        merger_1_expanded = self.merger_1.unsqueeze(1)  # Shape: (1024, 1)
+        merger_2_expanded = self.merger_2.unsqueeze(1)  # Shape: (1024, 1)
+        merger_3_expanded = self.merger_3.unsqueeze(1)  # Shape: (1024, 1)
+        
+        # Perform element-wise multiplication, which will broadcast the merger parameters across the second dimension
+        return self.base_weight + merger_1_expanded * self.task_vector_1 + merger_2_expanded * self.task_vector_2 + merger_3_expanded * self.task_vector_3
+
     
     def get_dam_bias(self):
         if self.base_bias is not None:
