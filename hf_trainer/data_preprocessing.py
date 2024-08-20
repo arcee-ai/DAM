@@ -1,7 +1,8 @@
 from datasets import Dataset, DatasetDict
 from transformers import AutoTokenizer
 
-def preprocess_data(templated_datasets, model_name, cache_dir=None, max_length=4096):
+
+def preprocess_data(templated_datasets, model_name, cache_dir=None, max_length=2048):
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True, cache_dir=cache_dir)
 
     # Ensure the tokenizer has a padding token

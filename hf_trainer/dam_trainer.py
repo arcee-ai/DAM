@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from transformers import Trainer
-from dam import DAMLinearLayer, DAMEmbeddingLayer
+from modeling.dam import DAMLinearLayer, DAMEmbeddingLayer
 import os
 from tqdm import tqdm
 
