@@ -48,11 +48,11 @@ class DAMBaseLayer(nn.Module):
         similarity_loss = torch.tensor(0.0)
 
         if lambda_coef is not None:
-            sim_12 = F.cosine_similarity(self.merger_1, self.merger_2, dim=0)
-            sim_13 = F.cosine_similarity(self.merger_1, self.merger_3, dim=0)
-            sim_23 = F.cosine_similarity(self.merger_2, self.merger_3, dim=0)
+            sim_12 = F.cosine_similarity(self.merger_1, self.merger_2, dim=0).to(similarity_loss.device)
+            sim_13 = F.cosine_similarity(self.merger_1, self.merger_3, dim=0).to(similarity_loss.device)
+            sim_23 = F.cosine_similarity(self.merger_2, self.merger_3, dim=0).to(similarity_loss.device)
             
-            similarity_loss = (sim_12 + sim_13 + sim_23) / 3
+            similarity_loss += (sim_12 + sim_13 + sim_23) / 3
             similarity_loss *= lambda_coef
 
         return similarity_loss
@@ -60,7 +60,7 @@ class DAMBaseLayer(nn.Module):
     def compute_mergers_L2_reg(self, lambda_coef_reg=None):
         l2_reg = torch.tensor(0.0)
         if lambda_coef_reg is not None:
-            l2_reg = (
+            l2_reg += (
                 self.merger_1.norm(2) +
                 self.merger_2.norm(2) +
                 self.merger_3.norm(2)

@@ -6,13 +6,15 @@ import os
 from tqdm import tqdm
 
 class DAMTrainer(Trainer):
-    def compute_loss(self, model, inputs, lambda_coef=0.01, lambda_coef_reg=None, temperature=2.0, return_outputs=False):
-        # Ensure all tensors are on the same device (single GPU)
-        device = model.device
-        
+    def __init__(self, lambda_coef=0.01, lambda_coef_reg=None, temperature=2.0, **kwargs):
+        super().__init__(**kwargs)
         self.lambda_coef = lambda_coef
         self.lambda_coef_reg = lambda_coef_reg
         self.temperature = temperature
+    
+    def compute_loss(self, model, inputs, return_outputs=False):
+        # Ensure all tensors are on the same device (single GPU)
+        device = model.device
 
         # Extract inputs for model and move them to the correct device
         input_ids_1 = inputs['input_ids_1'].to(device)
@@ -57,33 +59,31 @@ class DAMTrainer(Trainer):
 
         loss_1 = F.kl_div(
             F.log_softmax(merged_logits_1 / self.temperature, dim=-1),
-            F.softmax(logits_1 / temperature, dim=-1),
+            F.softmax(logits_1 / self.temperature, dim=-1),
             reduction='batchmean'
-        ) * (self.temperature ** 2)
+        ) * (self.temperature ** 2) / input_ids_1.size(1)
 
         loss_2 = F.kl_div(
             F.log_softmax(merged_logits_2 / self.temperature, dim=-1),
             F.softmax(logits_2 / self.temperature, dim=-1),
             reduction='batchmean'
-        ) * (self.temperature ** 2)
+        ) * (self.temperature ** 2) / input_ids_2.size(1)
 
         loss_3 = F.kl_div(
             F.log_softmax(merged_logits_3 / self.temperature, dim=-1),
             F.softmax(logits_3 / self.temperature, dim=-1),
             reduction='batchmean'
-        ) * (self.temperature ** 2)
+        ) * (self.temperature ** 2) / input_ids_3.size(1)
 
         similarity_loss = torch.tensor(0.0, device=device)
         similarity_reg_loss = torch.tensor(0.0, device=device)
-        for module in base_model.modules():
+        for module in model.modules():
             if isinstance(module, (DAMLinearLayer, DAMEmbeddingLayer)):
                 similarity_loss += module.compute_mergers_similarity(self.lambda_coef).to(similarity_loss.device)
                 similarity_reg_loss += module.compute_mergers_L2_reg(self.lambda_coef_reg).to(similarity_reg_loss.device)
          
         # Total loss (sum across the batch)
         total_loss = (loss_1 + loss_2 + loss_3) + similarity_loss + similarity_reg_loss
-
-        print(total_loss)
 
         return (total_loss, merged_logits_1) if return_outputs else total_loss
 

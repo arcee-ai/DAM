@@ -16,18 +16,16 @@ def main():
     model_name = "mistralai/Mistral-7B-v0.1"
     model_A_name = "augmxnt/shisa-gamma-7b-v1"
     model_B_name = "WizardLM/WizardMath-7B-V1.1"
-    model_C_name = "GAIR/Abel-7B-002"
+    model_C_name = "arcee-train/Abel-7B-002-truncated-embeds"
     cache_dir = "/workspace/.hf"
 
     # Setup tokenizer and datasets
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True, cache_dir=cache_dir)
-    templated_datasets = setup_datasets_and_templates(tokenizer, example_count=10)
+    templated_datasets = setup_datasets_and_templates(tokenizer, example_count=1069)
 
     # Data preprocessing
     combined_dataset, tokenizer = preprocess_data(templated_datasets, model_name, cache_dir)
-
-    # Model preparation
-    # base_model, tokenizer = prepare_model(model_name, model_A_name, model_B_name, model_C_name, cache_dir)
+    model, tokenizer = prepare_model(model_name, model_A_name, model_B_name, model_C_name, cache_dir)
 
     # Training arguments
     training_args = TrainingArguments(
@@ -35,11 +33,12 @@ def main():
         eval_strategy="no",
         save_strategy="no", 
         do_eval=False,     
-        learning_rate=2e-5,
+        learning_rate=1e-3,
         per_device_train_batch_size=1,
         per_device_eval_batch_size=1,
         num_train_epochs=1,
-        weight_decay=0.01,
+        weight_decay=0.00,
+        lr_scheduler_type='constant',
         bf16=True,
         push_to_hub=False,
         remove_unused_columns=False,
@@ -49,11 +48,9 @@ def main():
         report_to="tensorboard",      
     )
 
-    base_model, tokenizer = prepare_model(model_name, model_A_name, model_B_name, model_C_name, cache_dir)
-
     # Initialize DAMTrainer
     trainer = DAMTrainer(
-        model=base_model,
+        model=model,
         args=training_args,
         train_dataset=combined_dataset,
         tokenizer=tokenizer,
