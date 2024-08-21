@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from transformers import Trainer
-from modeling.dam import DAMLinearLayer, DAMEmbeddingLayer
+from modeling.dam import DAMLinearLayer
 import os
 from tqdm import tqdm
 
@@ -111,10 +111,6 @@ class DAMTrainer(Trainer):
                 new_module.weight.data = merged_weight
                 if merged_bias is not None:
                     new_module.bias.data = merged_bias
-                    
-            if isinstance(module, DAMEmbeddingLayer):
-                merged_weight = module.get_dam_embedding_weight()
-                new_module.weight.data = merged_weight
 
         # Save the new model
         new_model.save_pretrained(output_dir)

@@ -13,10 +13,7 @@ os.environ['HF_HOME'] = '/workspace/.hf'
 
 def main():
     # Model and dataset details
-    premerged_model_name = "arcee-ai/untrained-DAM-merge-01"
-    model_A_name = "augmxnt/shisa-gamma-7b-v1"
-    model_B_name = "WizardLM/WizardMath-7B-V1.1"
-    model_C_name = "arcee-train/Abel-7B-002-truncated-embeds"
+    model_name = "arcee-ai/untrained-DAM-merge-01"
     cache_dir = "/workspace/.hf"
 
     # Setup tokenizer and datasets
@@ -25,7 +22,7 @@ def main():
 
     # Data preprocessing
     combined_dataset, tokenizer = preprocess_data(templated_datasets, model_name, cache_dir)
-    model = prepare_model(premerged_model_name, cache_dir)
+    model = prepare_model(model_name, cache_dir)
 
     # Training arguments
     training_args = TrainingArguments(

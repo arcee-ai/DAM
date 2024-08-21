@@ -3,7 +3,7 @@ import gc
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from modeling.modeling import MergedMistralForCausalLM
 from glom import glom, Assign
-from modeling.dam import DAMLinearLayer, DAMEmbeddingLayer
+from modeling.dam import DAMLinearLayer
 from utils import find_linear_layers, find_embedding_layers
 
 def print_trainable_parameters(model):
@@ -26,14 +26,14 @@ def prepare_model(MODEL_ID, apply_to_embeddings=False):
     merged_model = MergedMistralForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16, device_map="auto")
 
     # Freeze all parameters except for the specific layers
+    for param in merged_model.parameters():
+        param.requires_grad = False
+    
     for module in merged_model.modules():
-        if isinstance(module, (DAMLinearLayer, DAMEmbeddingLayer)):
+        if isinstance(module, DAMLinearLayer):
             for param in module.parameters():
                 param.requires_grad = True
-        else:
-            for param in module.parameters():
-                param.requires_grad = False
-
+    
     print_trainable_parameters(merged_model)
 
     return merged_model
