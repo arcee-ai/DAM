@@ -23,7 +23,9 @@ def print_trainable_parameters(model):
     )
     
 def prepare_model(MODEL_ID, apply_to_embeddings=False):
-    merged_model = MergedMistralForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16, device_map="auto")
+    #merged_model = MergedMistralForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16, device_map="auto")
+    # we can't do this auto when we are using deepspeed.
+    merged_model = MergedMistralForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16)
 
     # Freeze all parameters except for the specific layers
     for param in merged_model.parameters():

@@ -49,15 +49,16 @@ class DAMTrainer(Trainer):
         for i in range(1, num_inputs + 1):
             merged_logits = merged_logits_dict[f'merged_logits_{i}']
             other_model_logits = logits_dict[f'model_{i}']
+            
+            # Calculate the KL divergence loss with normalization by the input length
             kl_loss = F.kl_div(
                 F.log_softmax(merged_logits / self.temperature, dim=-1),
                 F.softmax(other_model_logits / self.temperature, dim=-1),
                 reduction='batchmean'
-            ) * (self.temperature ** 2)
+            ) * (self.temperature ** 2) / merged_logits.size(1)
+            
             total_loss += kl_loss
-
-        print(total_loss)
-        exit()
+        
         # Compute similarity loss and L2 regularization for merging coefficients
         similarity_loss = torch.tensor(0.0, device=device)
         l2_reg = torch.tensor(0.0, device=device)
@@ -66,7 +67,6 @@ class DAMTrainer(Trainer):
                 similarity_loss += module.compute_mergers_similarity(self.lambda_coef).to(similarity_loss.device)
             if hasattr(module, 'compute_mergers_L2_reg'):
                 l2_reg += module.compute_mergers_L2_reg(self.lambda_coef_reg).to(l2_reg.device)
-
         total_loss += similarity_loss + l2_reg
 
         return (total_loss, merged_logits) if return_outputs else total_loss

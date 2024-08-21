@@ -6,11 +6,21 @@ from data_preprocessing import preprocess_data
 from model_preparation import prepare_model
 from dam_trainer import DAMTrainer  # Custom DAMTrainer
 from transformers import TrainingArguments, default_data_collator
+from modeling.dam import DAMBaseLayer
 
 # Environment variables
 os.environ['HF_TOKEN'] = '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'
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 os.environ['HF_HOME'] = '/workspace/hf-cache'
+
+def print_trainable_params(model, title="Trainable Parameters"):
+    print(f"\n{title}:")
+    trainable_params_count = 0
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            #print(f" - {name}: {param.shape}")
+            trainable_params_count += param.numel()
+    print(f"Total trainable parameters: {trainable_params_count}")
 
 def main():
     # Model and dataset details
@@ -30,9 +40,31 @@ def main():
     MODEL_ID_C = "arcee-train/Abel-7B-002-truncated-embeds"
 
     model = prepare_model(model_name, cache_dir)
-    model_A = AutoModelForCausalLM.from_pretrained(MODEL_ID_A, torch_dtype=torch.bfloat16, device_map="auto", cache_dir=cache_dir)
-    model_B = AutoModelForCausalLM.from_pretrained(MODEL_ID_B, torch_dtype=torch.bfloat16, device_map="auto", cache_dir=cache_dir)
-    model_C = AutoModelForCausalLM.from_pretrained(MODEL_ID_C, torch_dtype=torch.bfloat16, device_map="auto", cache_dir=cache_dir)
+
+    print_trainable_params(model, title="Before Freezing")
+
+    # freeze the base model (WE DO NOT NEED TO DO THIS SINCE WE FREEZE THE BASE MODEL IN THE DAMBaseLayer)
+    for param in model.parameters():
+        param.requires_grad = False
+
+    # unfreeze the merging coefficients
+    for module in model.modules():
+        if isinstance(module, DAMBaseLayer):  # Identify your custom layers
+            for merger in module.mergers:
+                merger.requires_grad = True  # Unfreeze only the merging coefficients
+            if hasattr(module, 'bias_mergers'):  # Check if there are bias mergers
+                for bias_merger in module.bias_mergers:
+                    bias_merger.requires_grad = True
+
+    print_trainable_params(model, title="After Freezing")
+
+    # model_A = AutoModelForCausalLM.from_pretrained(MODEL_ID_A, torch_dtype=torch.bfloat16, device_map="auto", cache_dir=cache_dir)
+    # model_B = AutoModelForCausalLM.from_pretrained(MODEL_ID_B, torch_dtype=torch.bfloat16, device_map="auto", cache_dir=cache_dir)
+    # model_C = AutoModelForCausalLM.from_pretrained(MODEL_ID_C, torch_dtype=torch.bfloat16, device_map="auto", cache_dir=cache_dir)
+
+    model_A = AutoModelForCausalLM.from_pretrained(MODEL_ID_A, torch_dtype=torch.bfloat16,  cache_dir=cache_dir)
+    model_B = AutoModelForCausalLM.from_pretrained(MODEL_ID_B, torch_dtype=torch.bfloat16,  cache_dir=cache_dir)
+    model_C = AutoModelForCausalLM.from_pretrained(MODEL_ID_C, torch_dtype=torch.bfloat16,  cache_dir=cache_dir)
 
     # Dictionary of models
     models_dict = {
