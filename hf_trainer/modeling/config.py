@@ -119,6 +119,7 @@ class MergedMistralConfig(PretrainedConfig):
         rope_theta=10000.0,
         sliding_window=4096,
         attention_dropout=0.0,
+        num_merged_models=3,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -141,6 +142,7 @@ class MergedMistralConfig(PretrainedConfig):
         self.use_cache = use_cache
         self.rope_theta = rope_theta
         self.attention_dropout = attention_dropout
+        self.num_merged_models = num_merged_models
 
         super().__init__(
             pad_token_id=pad_token_id,
