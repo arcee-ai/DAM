@@ -3,15 +3,9 @@ from torch import nn, Tensor
 import torch.nn.functional as F
 from typing import Optional, Union
 from torch.nn.parameter import Parameter
-from transformers import AutoModelForCausalLM
 import itertools
-    
+
 class DAMBaseLayer(nn.Module):
-    """
-    Base class for DAM (Dynamic Alignment Merger) layers, which handles common functionality for both linear 
-    and embedding layers. It merges layers from a base model and three other models using fixed weights 
-    provided for each model. The trainable merging coefficients control how these weights are combined during training.
-    """
     def __init__(
         self,
         in_features: int,
@@ -57,7 +51,6 @@ class DAMBaseLayer(nn.Module):
     
         return similarity_loss
 
-
     def compute_mergers_L2_reg(self, lambda_coef_reg=None):
         l2_reg = torch.tensor(0.0)
         if lambda_coef_reg is not None:
@@ -70,15 +63,10 @@ class DAMBaseLayer(nn.Module):
         return l2_reg
 
     def unfreeze(self):
-        self.merger_1.requires_grad = True
-        self.merger_2.requires_grad = True
-        self.merger_3.requires_grad = True
+        for merger in self.mergers:
+            merger.requires_grad = True
 
 class DAMLinearLayer(DAMBaseLayer):
-    """
-    DAMLinearLayer merges linear layers from a base model and three other models using fixed weights provided 
-    for each model. The trainable merging coefficients control how these weights are combined during training.
-    """
     def __init__(
         self,
         in_features: int,
@@ -110,15 +98,18 @@ class DAMLinearLayer(DAMBaseLayer):
         return [getattr(self, f"bias_{i}") for i in range(self.num_models)]
         
     def get_dam_weight(self):
-        return sum(merger * weight for merger, weight in zip(self.weights, self.mergers))
+        device = self.mergers[0].device
+        return sum(merger.to(device) * weight.to(device) for merger, weight in zip(self.weights, self.mergers))
     
     def get_dam_bias(self):
         if hasattr(self, 'bias_0'):
-            return sum(merger * bias for merger, bias in zip(self.biases, self.bias_mergers))
+            device = self.bias_mergers[0].device
+            return sum(merger.to(device) * bias.to(device) for merger, bias in zip(self.bias_mergers, self.biases))
         return None
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        weight = self.get_dam_weight()
-        bias = self.get_dam_bias()
+        # Ensure hidden_states are on the same device as the weights
+        weight = self.get_dam_weight().to(hidden_states.device)
+        bias = self.get_dam_bias().to(hidden_states.device) if self.get_dam_bias() is not None else None
 
         return F.linear(hidden_states, weight=weight, bias=bias)

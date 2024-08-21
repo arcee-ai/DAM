@@ -11,8 +11,9 @@ class DAMTrainer(Trainer):
         self.temperature = temperature
     
     def compute_loss(self, merged_model, inputs, return_outputs=False):
-        # Extract device
+        # Ensure merged_model is on the correct device
         device = next(iter(self.models_dict.values())).device  # Assuming all models are on the same device
+        merged_model = merged_model.to(device)
         
         # Dynamically identify the number of input types (e.g., input_ids_1, input_ids_2, etc.)
         input_keys = [key for key in inputs.keys() if key.startswith('input_ids_')]
@@ -31,11 +32,15 @@ class DAMTrainer(Trainer):
         for i in range(1, num_inputs + 1):
             input_ids = input_ids_dict[f'input_ids_{i}']
             attention_mask = attention_mask_dict[f'attention_mask_{i}']
+            # Ensure that the input tensors are on the same device as the model
+            input_ids = input_ids.to(device)
+            attention_mask = attention_mask.to(device)
             merged_logits_dict[f'merged_logits_{i}'] = merged_model(input_ids=input_ids, attention_mask=attention_mask).logits
 
         # Calculate logits for each model in models_dict without gradients
         logits_dict = {}
         for key, model in self.models_dict.items():
+            model = model.to(device)  # Ensure each model is on the correct device
             model_index = int(key.split('_')[-1])  # Extract the index from model key (e.g., model_1)
             if model_index <= num_inputs:  # Ensure the index is within the range of available inputs
                 input_ids = input_ids_dict[f'input_ids_{model_index}']
@@ -67,6 +72,7 @@ class DAMTrainer(Trainer):
                 similarity_loss += module.compute_mergers_similarity(self.lambda_coef).to(similarity_loss.device)
             if hasattr(module, 'compute_mergers_L2_reg'):
                 l2_reg += module.compute_mergers_L2_reg(self.lambda_coef_reg).to(l2_reg.device)
+    
         total_loss += similarity_loss + l2_reg
 
         return (total_loss, merged_logits) if return_outputs else total_loss
