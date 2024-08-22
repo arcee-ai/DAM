@@ -2,12 +2,9 @@ import os
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from datasets import load_from_disk
-from data_setup import setup_datasets_and_templates
-from data_preprocessing import preprocess_data
 from model_preparation import prepare_model
-from dam_trainer_top_k import DAMTrainer  # Custom DAMTrainer
+from custom_trainer.dam_trainer_top_k import DAMTrainer  # Custom DAMTrainer
 from transformers import TrainingArguments, default_data_collator
-from modeling.dam import DAMBaseLayer
 
 # Environment variables
 os.environ['HF_TOKEN'] = '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'
@@ -70,3 +67,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# ACCELERATE_LOG_LEVEL=info accelerate launch  --config_file deepspeed_zero3.yaml  --num_processes 4 train_top_k.py
