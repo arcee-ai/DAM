@@ -1,123 +1,78 @@
 import torch
 import torch.nn.functional as F
 from transformers import Trainer
-from dam import DAMLinearLayer, DAMEmbeddingLayer
-import os
-from tqdm import tqdm
 
 class DAMTrainer(Trainer):
-    def __init__(self, lambda_coef=0.01, lambda_coef_reg=None, temperature=2.0, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, model, models_dict, lambda_coef=0.01, lambda_coef_reg=0.01, temperature=2.0, **kwargs):
+        super().__init__(model=model, **kwargs)  # Pass the main model to the Trainer
+        self.models_dict = models_dict  # Store the models_dict as an attribute
         self.lambda_coef = lambda_coef
         self.lambda_coef_reg = lambda_coef_reg
         self.temperature = temperature
     
-    def compute_loss(self, model, inputs, return_outputs=False):
-        # Ensure all tensors are on the same device (single GPU)
-        device = model.device
+    def compute_loss(self, merged_model, inputs, return_outputs=False):
+        # Ensure merged_model is on the correct device
+        device = next(iter(self.models_dict.values())).device  # Assuming all models are on the same device
+        merged_model = merged_model.to(device)
+        
+        # Dynamically identify the number of input types (e.g., input_ids_1, input_ids_2, etc.)
+        input_keys = [key for key in inputs.keys() if key.startswith('input_ids_')]
+        num_inputs = len(input_keys)
+    
+        # Prepare dictionaries to store input_ids and attention_masks
+        input_ids_dict = {}
+        attention_mask_dict = {}
+        
+        for i in range(1, num_inputs + 1):
+            input_ids_dict[f'input_ids_{i}'] = inputs[f'input_ids_{i}'].to(device)
+            attention_mask_dict[f'attention_mask_{i}'] = inputs[f'attention_mask_{i}'].to(device)
 
-        # Extract inputs for model and move them to the correct device
-        input_ids_1 = inputs['input_ids_1'].to(device)
-        attention_mask_1 = inputs['attention_mask_1'].to(device)
-        labels_1 = inputs['labels_1'].to(device)
+        # Compute logits for the merged model separately for each input
+        merged_logits_dict = {}
+        for i in range(1, num_inputs + 1):
+            input_ids = input_ids_dict[f'input_ids_{i}']
+            attention_mask = attention_mask_dict[f'attention_mask_{i}']
+            # Ensure that the input tensors are on the same device as the model
+            input_ids = input_ids.to(device)
+            attention_mask = attention_mask.to(device)
+            merged_logits_dict[f'merged_logits_{i}'] = merged_model(input_ids=input_ids, attention_mask=attention_mask).logits
 
-        input_ids_2 = inputs['input_ids_2'].to(device)
-        attention_mask_2 = inputs['attention_mask_2'].to(device)
-        labels_2 = inputs['labels_2'].to(device)
+        # Calculate logits for each model in models_dict without gradients
+        logits_dict = {}
+        for key, model in self.models_dict.items():
+            model = model.to(device)  # Ensure each model is on the correct device
+            model_index = int(key.split('_')[-1])  # Extract the index from model key (e.g., model_1)
+            if model_index <= num_inputs:  # Ensure the index is within the range of available inputs
+                input_ids = input_ids_dict[f'input_ids_{model_index}']
+                attention_mask = attention_mask_dict[f'attention_mask_{model_index}']
+                with torch.no_grad():
+                    model.eval()
+                    logits_dict[key] = model(input_ids=input_ids, attention_mask=attention_mask).logits
 
-        input_ids_3 = inputs['input_ids_3'].to(device)
-        attention_mask_3 = inputs['attention_mask_3'].to(device)
-        labels_3 = inputs['labels_3'].to(device)
-
-        # Compute logits for each input set (across batches)
-        with torch.no_grad():
-            model.eval()
-            for module in model.modules():
-                if isinstance(module, (DAMLinearLayer, DAMEmbeddingLayer)):
-                    module.set_forward_type('weight_1')
-            logits_1 = model(input_ids=input_ids_1, attention_mask=attention_mask_1, labels=labels_1).logits
-
-            for module in model.modules():
-                if isinstance(module, (DAMLinearLayer, DAMEmbeddingLayer)):
-                    module.set_forward_type('weight_2')
-            logits_2 = model(input_ids=input_ids_2, attention_mask=attention_mask_2, labels=labels_2).logits
-
-            for module in model.modules():
-                if isinstance(module, (DAMLinearLayer, DAMEmbeddingLayer)):
-                    module.set_forward_type('weight_3')
-            logits_3 = model(input_ids=input_ids_3, attention_mask=attention_mask_3, labels=labels_3).logits
-
-        # Merge forward
-        model.train()
-        for module in model.modules():
-            if isinstance(module, (DAMLinearLayer, DAMEmbeddingLayer)):
-                module.set_forward_type('merge')
-
-        merged_logits_1 = model(input_ids=input_ids_1, attention_mask=attention_mask_1, labels=labels_1).logits
-        merged_logits_2 = model(input_ids=input_ids_2, attention_mask=attention_mask_2, labels=labels_2).logits
-        merged_logits_3 = model(input_ids=input_ids_3, attention_mask=attention_mask_3, labels=labels_3).logits
-
-        loss_1 = F.kl_div(
-            F.log_softmax(merged_logits_1 / self.temperature, dim=-1),
-            F.softmax(logits_1 / self.temperature, dim=-1),
-            reduction='batchmean'
-        ) * (self.temperature ** 2) / input_ids_1.size(1)
-
-        loss_2 = F.kl_div(
-            F.log_softmax(merged_logits_2 / self.temperature, dim=-1),
-            F.softmax(logits_2 / self.temperature, dim=-1),
-            reduction='batchmean'
-        ) * (self.temperature ** 2) / input_ids_2.size(1)
-
-        loss_3 = F.kl_div(
-            F.log_softmax(merged_logits_3 / self.temperature, dim=-1),
-            F.softmax(logits_3 / self.temperature, dim=-1),
-            reduction='batchmean'
-        ) * (self.temperature ** 2) / input_ids_3.size(1)
-
+        # Compute KL divergence loss between the merged model's logits and each corresponding model's logits
+        total_loss = 0.0
+        for i in range(1, num_inputs + 1):
+            merged_logits = merged_logits_dict[f'merged_logits_{i}']
+            other_model_logits = logits_dict[f'model_{i}']
+            
+            # Calculate the KL divergence loss with normalization by the input length
+            kl_loss = F.kl_div(
+                F.log_softmax(merged_logits / self.temperature, dim=-1),
+                F.softmax(other_model_logits / self.temperature, dim=-1),
+                reduction='batchmean'
+            ) * (self.temperature ** 2) / merged_logits.size(1)
+            
+            total_loss += kl_loss
+        
+        # Compute similarity loss and L2 regularization for merging coefficients
         similarity_loss = torch.tensor(0.0, device=device)
-        similarity_reg_loss = torch.tensor(0.0, device=device)
-        for module in model.modules():
-            if isinstance(module, (DAMLinearLayer, DAMEmbeddingLayer)):
+        l2_reg = torch.tensor(0.0, device=device)
+        for module in merged_model.modules():
+            if hasattr(module, 'compute_mergers_similarity'):
                 similarity_loss += module.compute_mergers_similarity(self.lambda_coef).to(similarity_loss.device)
-                similarity_reg_loss += module.compute_mergers_L2_reg(self.lambda_coef_reg).to(similarity_reg_loss.device)
-         
-        # Total loss (sum across the batch)
-        total_loss = (loss_1 + loss_2 + loss_3) + similarity_loss + similarity_reg_loss
+            if hasattr(module, 'compute_mergers_L2_reg'):
+                l2_reg += module.compute_mergers_L2_reg(self.lambda_coef_reg).to(l2_reg.device)
+    
+        total_loss += similarity_loss + l2_reg
 
-        return (total_loss, merged_logits_1) if return_outputs else total_loss
-
-    #def save_model(self, output_dir=None, _internal_call: bool = True ):
-    def save_model(self, output_dir=None, **kwargs):
-        # Handle any extra arguments (e.g., _internal_call) to prevent issues
-        if output_dir is None:
-            output_dir = self.args.output_dir
-
-        # Ensure the output directory exists
-        os.makedirs(output_dir, exist_ok=True)
-
-        # Create a new model instance with the same architecture as the base model
-        new_model = self.model.__class__.from_pretrained(self.model.config._name_or_path, torch_dtype=self.model.dtype)
-
-        # Iterate through all modules and update weights for DAM layers
-        for (name, module), (_, new_module) in tqdm(zip(self.model.named_modules(), new_model.named_modules()), 
-                                                    desc="Merging layers"):
-            if isinstance(module, DAMLinearLayer):
-                # Get the merged weight and bias
-                merged_weight = module.get_dam_weight()
-                merged_bias = module.get_dam_bias()
-                
-                # Update the weights and bias of the corresponding layer in the new model
-                new_module.weight.data = merged_weight
-                if merged_bias is not None:
-                    new_module.bias.data = merged_bias
-                    
-            if isinstance(module, DAMEmbeddingLayer):
-                merged_weight = module.get_dam_embedding_weight()
-                new_module.weight.data = merged_weight
-
-        # Save the new model
-        new_model.save_pretrained(output_dir)
-        self.tokenizer.save_pretrained(output_dir)
-
-        print("Merged model saved successfully!")
+        return (total_loss, merged_logits) if return_outputs else total_loss
