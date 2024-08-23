@@ -74,10 +74,14 @@ class DAMBaseLayer(nn.Module):
 
     # Method to compute L2 regularization on the merging coefficients
     def compute_mergers_L2_reg(self, lambda_coef_reg=None):
-        l2_reg = torch.tensor(0.0).to(self.mergers[0].device)  # Ensure l2_reg is on the same device as the mergers
-        if lambda_coef_reg is not None:
-            # Calculate L2 norm for each merging coefficient in the ParameterList and sum them
-            l2_reg += sum(merger.norm(2).to(self.mergers[0].device) for merger in self.mergers) * lambda_coef_reg
+        if lambda_coef_reg is None:
+            return torch.tensor(0.0, device=self.mergers[0].device)
+
+        # Initialize l2_reg on the same device as the mergers
+        l2_reg = torch.tensor(0.0, device=self.mergers[0].device)
+        
+        # Calculate L2 norm for each merging coefficient in the ParameterList and sum them
+        l2_reg += sum(merger.norm(2).to(self.mergers[0].device) for merger in self.mergers) * lambda_coef_reg
 
         return l2_reg
 

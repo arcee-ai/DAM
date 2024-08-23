@@ -52,6 +52,8 @@ class DAMTrainer(Trainer):
             ) * (self.temperature ** 2) / gathered_merged_logits.size(1)
             
             total_loss += kl_loss
+
+        print(total_loss)
         
         # Compute similarity loss and L2 regularization for merging coefficients
         similarity_loss = torch.tensor(0.0, device=device)
@@ -61,9 +63,10 @@ class DAMTrainer(Trainer):
                 similarity_loss += module.compute_mergers_similarity(self.lambda_coef).to(similarity_loss.device)
             if hasattr(module, 'compute_mergers_L2_reg'):
                 l2_reg += module.compute_mergers_L2_reg(self.lambda_coef_reg).to(l2_reg.device)
-                print(l2_reg)
-                exit()
-    
+
+        print(similarity_loss)
+        print(l2_reg, self.lambda_coef_reg)
+        exit()
         total_loss += similarity_loss + l2_reg
 
         return (total_loss, merged_logits) if return_outputs else total_loss
