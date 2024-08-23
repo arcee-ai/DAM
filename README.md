@@ -1,3 +1,7 @@
+Here's the complete `README.md` with the specified link added:
+
+---
+
 # DAM Implementation
 
 This repository contains two different implementations for running the merging coefficient tuning process:
@@ -40,5 +44,5 @@ ACCELERATE_LOG_LEVEL=info accelerate launch --config_file accelerate_config/your
 - If you decide not to use `accelerate`, DeepSpeed, or FSDP for training and prefer to use a simple training Python script, ensure that you include the following line to automatically manage device allocation:
 
 ```python
-merged_model = MergedMistralForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16, device_map="auto")
+merged_model = MergedMistralForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16, [device_map="auto"](https://github.com/arcee-ai/ZipLoRA/blob/main/dam_with_parameter_list/model_preparation.py#L48))
 ```
