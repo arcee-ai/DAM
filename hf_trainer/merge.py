@@ -44,9 +44,9 @@ def merge_models(base_model_id, model_ids, output_path, device):
         ).to(device)
 
         for i, module in enumerate(modules):
-            glom(dam_layer, f'weight_{i}').data = module.weight.data
+            dam_layer.weights[i].data = module.weight.data
             if module.bias is not None:
-                glom(dam_layer, f'bias_{i}').data = module.bias.data
+                dam_layer.biases[i].data = module.weight.data
 
         assign = Assign(m, dam_layer)
         glom(merged_model, assign)

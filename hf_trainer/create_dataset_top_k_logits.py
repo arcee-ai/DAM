@@ -111,9 +111,6 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     combined_dataset_with_top_k_logits = compute_and_save_topk_logits(models_dict, combined_dataset, device, batch_size=4, top_k=50)
 
-    print(combined_dataset_with_top_k_logits)
-    exit()
-
     # Save the dataset with logits to disk
     combined_dataset_with_top_k_logits.save_to_disk("./dataset_with_logits")
 

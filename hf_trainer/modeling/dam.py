@@ -21,16 +21,13 @@ class DAMBaseLayer(nn.Module):
         if init_merger_values == []:
             init_merger_values = [1/num_models] * num_models
 
-        for i in range(num_models):
-            self.register_buffer(f'weight_{i}', torch.zeros(out_features, in_features))
+        self.weights = nn.ParameterList([Parameter(
+            torch.zeros(out_features, in_features, dtype=dtype) * init_merger_values[i]
+        ) for i in range(num_models)])
 
         self.mergers = nn.ParameterList([Parameter(
             torch.ones(in_features, dtype=dtype) * init_merger_values[i]
         ) for i in range(num_models)])
-
-    @property
-    def weights(self):
-        return [getattr(self, f"weight_{i}") for i in range(self.num_models)]
 
     def compute_mergers_similarity(self, lambda_coef=None):
         if lambda_coef is None:
@@ -88,15 +85,9 @@ class DAMLinearLayer(DAMBaseLayer):
             init_merger_values = [1/num_models] * num_models
 
         if bias:
-            for i in range(num_models):
-                self.register_buffer(f'bias_{i}', torch.zeros(out_features))
-
+            self.biases = nn.ParameterList([nn.Parameter(torch.zeros(out_features, dtype=dtype) * init_merger_values[i]) for i in range(num_models)])
             self.bias_mergers = nn.ParameterList([nn.Parameter(torch.ones(1, dtype=dtype) * init_merger_values[i]) for i in range(num_models)])
 
-    @property
-    def biases(self):
-        return [getattr(self, f"bias_{i}") for i in range(self.num_models)]
-        
     def get_dam_weight(self):
         device = self.mergers[0].device
         return sum(merger.to(device) * weight.to(device) for merger, weight in zip(self.weights, self.mergers))

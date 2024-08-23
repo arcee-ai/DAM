@@ -44,9 +44,6 @@ class DAMTrainer(Trainer):
             # Gather the logits corresponding to the top-K indices
             gathered_merged_logits = torch.gather(merged_logits, dim=-1, index=topk_indices)
 
-            print(gathered_merged_logits)
-            exit()
-            
             # Calculate the KL divergence loss with normalization by the input length
             kl_loss = F.kl_div(
                 F.log_softmax(gathered_merged_logits / self.temperature, dim=-1),
