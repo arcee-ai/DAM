@@ -10,16 +10,16 @@ from transformers import TrainingArguments, default_data_collator
 from modeling.dam import DAMBaseLayer
 
 # Environment variables
-os.environ['HF_TOKEN'] = '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'
+os.environ['HF_TOKEN'] = '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' #'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'
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 os.environ['HF_HOME'] = '/workspace/hf-cache'
 
 def main():
     # Model and dataset details
-    base_model_name = "mistralai/Mistral-7B-v0.1"
-    model_name = "arcee-ai/untrained-DAM-merge-01"
+    base_model_name = "mistralai/Mistral-7B-v0.1" #"arcee-ai/untrained-DAM-merge-01"
+    model_name = "/workspace/ZipLoRA-1/hf_trainer/merged_model"# arcee-ai/pplist-merged-untrained 
     cache_dir = "/workspace/hf-cache"
-    hf_disk_dataset_dir = "/workspace/ZipLoRA/hf_trainer/dataset_with_logits"
+    hf_disk_dataset_dir = "/workspace/ZipLoRA-1/hf_trainer/dataset_with_logits" #arcee-ai/logits-dataset-mock
 
     # Setup tokenizer
     tokenizer = AutoTokenizer.from_pretrained(base_model_name, use_fast=True, cache_dir=cache_dir)
@@ -29,6 +29,13 @@ def main():
 
     # Prepare the model
     model = prepare_model(model_name, cache_dir)
+
+    # Push to hub
+    dataset.push_to_hub("arcee-ai/logits-dataset-mock")
+    tokenizer.push_to_hub("arcee-ai/pplist-merged-untrained")
+    model.push_to_hub("arcee-ai/pplist-merged-untrained")
+
+    exit()
 
     # Training arguments
     training_args = TrainingArguments(
