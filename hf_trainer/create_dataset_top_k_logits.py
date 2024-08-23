@@ -97,7 +97,7 @@ def main():
     combined_dataset, tokenizer = preprocess_data(templated_datasets, base_model_name, cache_dir)
 
     # Select only 10 examples for testing
-    combined_dataset = combined_dataset.select(range(10))
+    combined_dataset = combined_dataset.select(range(100))
 
     # Load additional models
     model_ids = [
@@ -110,6 +110,8 @@ def main():
     # Compute logits for each model and input set and save as additional columns
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     combined_dataset_with_top_k_logits = compute_and_save_topk_logits(models_dict, combined_dataset, device, batch_size=4, top_k=50)
+
+    print(combined_dataset_with_top_k_logits)
 
     # Save the dataset with logits to disk
     combined_dataset_with_top_k_logits.save_to_disk("./dataset_with_logits")
