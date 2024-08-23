@@ -9,6 +9,7 @@ from dam_trainer_top_k import DAMTrainer  # Custom DAMTrainer
 from transformers import TrainingArguments, default_data_collator
 from modeling.dam import DAMBaseLayer
 
+
 # Environment variables
 os.environ['HF_TOKEN'] = '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' #'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'
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
@@ -55,8 +56,10 @@ def main():
         logging_steps=1,
         logging_strategy="steps",
         report_to="tensorboard",
+        gradient_accumulation_steps=1
     )
 
+    
     # Initialize DAMTrainer
     trainer = DAMTrainer(
         model=model,  # Pass the main model here
@@ -66,7 +69,7 @@ def main():
         data_collator=default_data_collator,
         lambda_coef=0.01,  # Example lambda coefficient for regularization
         lambda_coef_reg=0.0001,  # Example lambda coefficient for regularization
-        temperature=2.0  # Example temperature for KL divergence
+        temperature=2.0,  # Example temperature for KL divergence
     )
 
     # Train the model
