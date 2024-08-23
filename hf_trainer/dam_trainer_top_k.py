@@ -61,6 +61,8 @@ class DAMTrainer(Trainer):
                 similarity_loss += module.compute_mergers_similarity(self.lambda_coef).to(similarity_loss.device)
             if hasattr(module, 'compute_mergers_L2_reg'):
                 l2_reg += module.compute_mergers_L2_reg(self.lambda_coef_reg).to(l2_reg.device)
+                print(l2_reg)
+                exit()
     
         total_loss += similarity_loss + l2_reg
 

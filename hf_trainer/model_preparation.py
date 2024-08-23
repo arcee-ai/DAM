@@ -47,7 +47,8 @@ def freeze_except_mergers(model):
 def prepare_model(MODEL_ID, apply_to_embeddings=False):
     #merged_model = MergedMistralForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16, device_map="auto")
     # we can't do this auto when we are using deepspeed.
-    merged_model = MergedMistralForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16)
+    #merged_model = MergedMistralForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16)
+    merged_model = MergedMistralForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16, device_map="auto")
 
     print_trainable_parameters(merged_model)
 

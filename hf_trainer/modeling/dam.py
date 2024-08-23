@@ -59,18 +59,28 @@ class DAMBaseLayer(nn.Module):
     
         return similarity_loss
 
+    # # Method to compute L2 regularization on the merging coefficients
+    # def compute_mergers_L2_reg(self, lambda_coef_reg=None):
+    #     l2_reg = torch.tensor(0.0)
+    #     if lambda_coef_reg is not None:
+    #         # Calculate L2 norm for each merging coefficient and sum them
+    #         l2_reg += (
+    #             self.merger_1.norm(2) +
+    #             self.merger_2.norm(2) +
+    #             self.merger_3.norm(2)
+    #         ) * lambda_coef_reg
+
+    #     return l2_reg
+
     # Method to compute L2 regularization on the merging coefficients
     def compute_mergers_L2_reg(self, lambda_coef_reg=None):
-        l2_reg = torch.tensor(0.0)
+        l2_reg = torch.tensor(0.0).to(self.mergers[0].device)  # Ensure l2_reg is on the same device as the mergers
         if lambda_coef_reg is not None:
-            # Calculate L2 norm for each merging coefficient and sum them
-            l2_reg += (
-                self.merger_1.norm(2) +
-                self.merger_2.norm(2) +
-                self.merger_3.norm(2)
-            ) * lambda_coef_reg
+            # Calculate L2 norm for each merging coefficient in the ParameterList and sum them
+            l2_reg += sum(merger.norm(2).to(self.mergers[0].device) for merger in self.mergers) * lambda_coef_reg
 
         return l2_reg
+
 
     # Method to unfreeze the merging coefficients so they can be trained
     def unfreeze(self):
