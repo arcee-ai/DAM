@@ -46,7 +46,7 @@ from transformers.utils import (
     replace_return_docstrings,
 )
 from .config import MergedMistralConfig
-from .dam import DAMLinearLayer
+from ..dam import DAMLinearLayer
 
 if is_flash_attn_2_available():
     from transformers.modeling_flash_attention_utils import _flash_attention_forward

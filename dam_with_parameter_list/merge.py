@@ -95,7 +95,7 @@ def main():
     parser = argparse.ArgumentParser(description="Merge multiple models into one DAM model.")
     parser.add_argument("base_model_id", help="ID of the base model (every weight except linear layers will be sourced from this model)")
     parser.add_argument("model_ids", nargs='+', help="IDs of the models to merge (for linear layers)")
-    parser.add_argument("output_path", help="Path to save the merged model")
+    parser.add_argument("--output_path", help="Path to save the merged model")
     parser.add_argument("--device", default="cpu", help="Device to use for computation (e.g., 'cpu', 'cuda')")
 
     args = parser.parse_args()
@@ -110,3 +110,6 @@ if __name__ == "__main__":
     # Model and dataset details
     cache_dir = "/workspace/hf-cache"
     main()
+
+
+# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 GAIR/Abel-7B-002 --device cuda --output_path /workspace/merged_model

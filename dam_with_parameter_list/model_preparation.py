@@ -1,7 +1,7 @@
 import torch
 import gc
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from modeling.modeling import MergedMistralForCausalLM
+from dam_with_parameter_list.modeling.mistral.modeling import MergedMistralForCausalLM
 from glom import glom, Assign
 from modeling.dam import DAMLinearLayer
 from utils import find_linear_layers, find_embedding_layers
