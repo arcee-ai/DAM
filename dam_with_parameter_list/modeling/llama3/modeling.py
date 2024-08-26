@@ -265,9 +265,9 @@ class MergedLlamaMLP(nn.Module):
         self.config = config
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
-        self.gate_proj = DAMLinearLayer(self.hidden_size, self.intermediate_size, bias=config.mlp_bias)
-        self.up_proj = DAMLinearLayer(self.hidden_size, self.intermediate_size, bias=config.mlp_bias)
-        self.down_proj = DAMLinearLayer(self.intermediate_size, self.hidden_size, bias=config.mlp_bias)
+        self.gate_proj = DAMLinearLayer(self.hidden_size, self.intermediate_size, bias=config.mlp_bias, num_models=config.num_merged_models)
+        self.up_proj = DAMLinearLayer(self.hidden_size, self.intermediate_size, bias=config.mlp_bias, num_models=config.num_merged_models)
+        self.down_proj = DAMLinearLayer(self.intermediate_size, self.hidden_size, bias=config.mlp_bias, num_models=config.num_merged_models)
         self.act_fn = ACT2FN[config.hidden_act]
 
     def forward(self, x):
@@ -329,10 +329,10 @@ class MergedLlamaAttention(nn.Module):
         self.rope_theta = config.rope_theta
         self.is_causal = True
 
-        self.q_proj = DAMLinearLayer(self.hidden_size, self.num_heads * self.head_dim, bias=config.attention_bias)
-        self.k_proj = DAMLinearLayer(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=config.attention_bias)
-        self.v_proj = DAMLinearLayer(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=config.attention_bias)
-        self.o_proj = DAMLinearLayer(self.num_heads * self.head_dim, self.hidden_size, bias=config.attention_bias)
+        self.q_proj = DAMLinearLayer(self.hidden_size, self.num_heads * self.head_dim, bias=config.attention_bias, num_models=config.num_merged_models)
+        self.k_proj = DAMLinearLayer(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=config.attention_bias, num_models=config.num_merged_models)
+        self.v_proj = DAMLinearLayer(self.hidden_size, self.num_key_value_heads * self.head_dim, bias=config.attention_bias, num_models=config.num_merged_models)
+        self.o_proj = DAMLinearLayer(self.num_heads * self.head_dim, self.hidden_size, bias=config.attention_bias, num_models=config.num_merged_models)
 
         # TODO (joao): remove in v4.45 (RoPE is computed in the model, not in the decoder layers)
         self.rotary_emb = MergedLlamaRotaryEmbedding(config=self.config)
@@ -864,10 +864,10 @@ class MergedLlamaModel(MergedLlamaPreTrainedModel):
     Transformer decoder consisting of *config.num_hidden_layers* layers. Each layer is a [`LlamaDecoderLayer`]
 
     Args:
-        config: LlamaConfig
+        config: MergedLlamaConfig
     """
 
-    def __init__(self, config: LlamaConfig):
+    def __init__(self, config: MergedLlamaConfig):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
@@ -1090,7 +1090,7 @@ class MergedLlamaForCausalLM(MergedLlamaPreTrainedModel):
         super().__init__(config)
         self.model = MergedLlamaModel(config)
         self.vocab_size = config.vocab_size
-        self.lm_head = DAMLinearLayer(config.hidden_size, config.vocab_size, bias=False)
+        self.lm_head = DAMLinearLayer(config.hidden_size, config.vocab_size, bias=False, num_models=config.num_merged_models)
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -1314,7 +1314,7 @@ class MergedLlamaForSequenceClassification(MergedLlamaPreTrainedModel):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.model = MergedLlamaConfig(config)
-        self.score = DAMLinearLayer(config.hidden_size, self.num_labels, bias=False)
+        self.score = DAMLinearLayer(config.hidden_size, self.num_labels, bias=False, num_models=config.num_merged_models)
 
         # Initialize weights and apply final processing
         self.post_init()
@@ -1431,7 +1431,7 @@ class MergedLlamaForQuestionAnswering(MergedLlamaPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.transformer = MergedLlamaModel(config)
-        self.qa_outputs =DAMLinearLayer(config.hidden_size, 2)
+        self.qa_outputs = DAMLinearLayer(config.hidden_size, 2, num_models=config.num_merged_models)
 
         # Initialize weights and apply final processing
         self.post_init()

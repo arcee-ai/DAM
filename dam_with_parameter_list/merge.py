@@ -12,9 +12,14 @@ def fix_config(save_path, num_models):
     config_path = os.path.join(save_path, 'config.json')
     with open(config_path, 'r') as file:
         data = json.load(file)
+        
+    if data['model_type'] == "mistral":
+        data['model_type'] = "mergedmistral"
+        data['architectures'][0] = 'MergedMistralForCausalLM'
+    elif data['model_type'] == "llama":
+        data['model_type'] = "mergedllama"
+        data['architectures'][0] = 'MergedLlamaForCausalLM'
 
-    data['model_type'] = "mergedmistral"
-    data['architectures'][0] = 'MergedMistralForCausalLM'
     data['num_merged_models'] = num_models
 
     with open(config_path, 'w') as file:

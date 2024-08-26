@@ -145,6 +145,7 @@ class MergedLlamaConfig(PretrainedConfig):
         attention_dropout=0.0,
         mlp_bias=False,
         head_dim=None,
+        num_merged_models=3,
         **kwargs,
     ):
         self.vocab_size = vocab_size
