@@ -120,7 +120,7 @@ def main():
     combined_dataset_with_top_k_logits.save_to_disk("./dataset_with_logits")
 
     # Push to hub
-    # combined_dataset_with_top_k_logits.push_to_hub("arcee-ai/logits-dataset-mock")
+    # combined_dataset_with_top_k_logits.push_to_hub("arcee-train/logits-dataset-mock")
 
 if __name__ == "__main__":
     main()

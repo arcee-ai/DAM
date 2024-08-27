@@ -16,9 +16,9 @@ os.environ['HF_HOME'] = '/workspace/hf-cache'
 def main():
     # Model and dataset details
     base_model_name = "mistralai/Mistral-7B-v0.1" 
-    model_name = "arcee-ai/pplist-merged-untrained"
+    model_name = "arcee-train/pplist-merged-untrained"
     cache_dir = "/workspace/hf-cache"
-    hf_disk_dataset_dir = "arcee-ai/logits-dataset-mock"
+    hf_disk_dataset_dir = "arcee-train/logits-dataset-mock"
 
     # Setup tokenizer
     tokenizer = AutoTokenizer.from_pretrained(base_model_name, use_fast=True, cache_dir=cache_dir)

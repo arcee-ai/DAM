@@ -90,7 +90,7 @@ def merge_models(base_model_id, model_ids, output_path, device):
 
     # push to the hub
     # tokenizer.push_to_hub("arcee-ai/pplist-merged-untrained")
-    # model.push_to_hub("arcee-ai/pplist-merged-untrained")
+    #merged_model.push_to_hub("arcee-train/pplist-merged-untrained")
 
     fix_config(output_path, num_models=len(models))
 
