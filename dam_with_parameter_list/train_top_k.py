@@ -37,7 +37,7 @@ def main():
         save_strategy="no",
         do_eval=False,
         learning_rate=1e-3,
-        per_device_train_batch_size=1,
+        per_device_train_batch_size=2,
         per_device_eval_batch_size=1,
         num_train_epochs=1,
         weight_decay=0.00,
