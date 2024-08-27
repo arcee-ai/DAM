@@ -10,7 +10,7 @@ You can choose either implementation based on your specific requirements.
 ## Steps to Run the Workflow
 
 ### 1. Create the Merged Model
-First, create the merged model by running the `merge.py` script found in the respective folder (`dam_with_buffer` or `dam_with_parameter_list`).
+First, create the merged model by running the `merge.py` script found in the respective folder (`dam_with_buffer` or `dam_with_parameter_list`). The resulting merged model will contain untrained coefficients.
 
 ### 2. Prepare the Dataset with Top-K Logits
 After creating the merged model, navigate to the `data` folder inside the chosen implementation (either `dam_with_buffer` or `dam_with_parameter_list`) and run `create_dataset_top_k_logits.py`. This script will:
@@ -24,17 +24,26 @@ The `modeling` folder should be modified to include the DAM layers. To add your 
 - Place your models within the respective implementation folder (`dam_with_buffer` or `dam_with_parameter_list`).
 - Ensure that the DAM layers are correctly integrated within these models before proceeding to training.
 
-### 4. Configuration Files
-The `accelerate_config` folder holds all the configurations related to the training environment, distributed computing settings, and other parameters. Make sure your configuration files are correctly set before running the training.
+### 4. Configure Accelerate and Assign the JSON File Path
+
+Before running the training, you need to configure `accelerate`. Run the following command to set up your environment:
+
+```bash
+accelerate config
+```
+
+Follow the prompts to complete the configuration. This will generate an `accelerate` configuration file.
+
+Next, ensure that the correct JSON configuration file is used for DeepSpeed. This file should be assigned in your command when launching the training script, as shown below.
 
 ### 5. Run the Training
 Finally, you can run the training process with the `train_top_k.py` script. Use the following command:
 
 ```bash
-ACCELERATE_LOG_LEVEL=info accelerate launch --config_file accelerate_config/your_config.json --num_processes 8 train_top_k.py
+ACCELERATE_LOG_LEVEL=info accelerate launch --config_file /workspace/ZipLoRA/dam_with_parameter_list/accelerate_config/deepspeed_config.json --num_processes 8 train_top_k.py
 ```
 
 ### Important Notes:
-- Replace `your_config.json` with the actual JSON configuration file that you have set up for `accelerate`.
+- Replace `/workspace/ZipLoRA/dam_with_parameter_list/accelerate_config/deepspeed_config.json` with the actual path to your JSON configuration file if it's different.
 - The number of processes (`--num_processes`) can be adjusted based on your hardware and the specific needs of your training task.
 - If you decide not to use `accelerate`, DeepSpeed, or FSDP for training and prefer to use a simple training Python script, ensure that you include the appropriate device management by using the `device_map="auto"` option. For more information on how to implement this, refer to [this line in the code](https://github.com/arcee-ai/ZipLoRA/blob/main/dam_with_parameter_list/model_preparation.py#L48).
