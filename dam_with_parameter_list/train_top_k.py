@@ -63,6 +63,8 @@ def main():
         lambda_coef=0.01,  # Example lambda coefficient for regularization
         lambda_coef_reg=0.0001,  # Example lambda coefficient for regularization
         temperature=2.0,  # Example temperature for KL divergence
+        use_kl=False,
+        use_mse=True
     )
 
     # Train the model
