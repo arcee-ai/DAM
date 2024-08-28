@@ -21,6 +21,7 @@ def fix_config(save_path, num_models):
         data['architectures'][0] = 'MergedLlamaForCausalLM'
 
     data['num_merged_models'] = num_models
+    data['use_tanh'] = False  # Add this line to set use_tanh to False
 
     with open(config_path, 'w') as file:
         json.dump(data, file, indent=2)
@@ -56,7 +57,8 @@ def merge_models(base_model_id, model_ids, output_path, device):
             out_features=modules[0].out_features,
             num_models=len(models),
             bias=modules[0].bias is not None,
-            dtype=modules[0].weight.dtype
+            dtype=modules[0].weight.dtype,
+            use_tanh=False  # Add this parameter to set use_tanh to False
         ).to(device)
 
 
