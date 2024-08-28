@@ -104,6 +104,12 @@ class MergedLlamaConfig(PretrainedConfig):
             Whether to use a bias in up_proj, down_proj and gate_proj layers in the MLP layers.
         head_dim (`int`, *optional*):
             The attention head dimension. If None, it will default to hidden_size // num_heads
+        num_merged_models (`int`, *optional*, defaults to 3):
+            The number of models being merged.
+        init_merger_values (`List[float]`, *optional*, defaults to []):
+            Initial values for the merger coefficients. If empty, defaults to equal values for each model.
+        use_tanh (`bool`, *optional*, defaults to False):
+            Whether to apply tanh non-linearity to the merger coefficients.
 
     ```python
     >>> from transformers import LlamaModel, LlamaConfig
@@ -146,6 +152,8 @@ class MergedLlamaConfig(PretrainedConfig):
         mlp_bias=False,
         head_dim=None,
         num_merged_models=3,
+        init_merger_values=[],
+        use_tanh=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -177,6 +185,8 @@ class MergedLlamaConfig(PretrainedConfig):
             self.rope_scaling["rope_type"] = self.rope_scaling["type"]
         rope_config_validation(self)
         self.num_merged_models = num_merged_models
+        self.init_merger_values = init_merger_values
+        self.use_tanh = use_tanh
 
         super().__init__(
             pad_token_id=pad_token_id,
