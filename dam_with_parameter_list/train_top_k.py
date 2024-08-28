@@ -61,7 +61,8 @@ def main():
         tokenizer=tokenizer,
         data_collator=default_data_collator,
         lambda_coef=0.01,  # Example lambda coefficient for regularization
-        lambda_coef_reg=0.0001,  # Example lambda coefficient for regularization
+        lambda_coef_l1=None,  # L1 regularization coefficient set to None
+        lambda_coef_l2=0.0001,  # L2 regularization coefficient
         temperature=2.0,  # Example temperature for KL divergence
         use_kl=False,
         use_mse=True
