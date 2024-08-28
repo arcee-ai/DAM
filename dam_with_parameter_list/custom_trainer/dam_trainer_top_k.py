@@ -1,19 +1,27 @@
 import torch
 import torch.nn.functional as F
-from transformers import Trainer
+from transformers import Trainer, AutoModelForCausalLM
+from modeling.dam import DAMLinearLayer
+from tqdm import tqdm
 
 import torch
 import torch.nn.functional as F
 from transformers import Trainer
 
 class DAMTrainer(Trainer):
-    def __init__(self, model, lambda_coef=0.01, lambda_coef_reg=0.01, temperature=2.0, use_kl=True, use_mse=False,  **kwargs):
+    def __init__(self, model, lambda_coef=0.01, 
+                 lambda_coef_reg=0.01, 
+                 temperature=2.0, use_kl=True, 
+                 use_mse=False, 
+                 base_model_path=None, 
+                 **kwargs):
         super().__init__(model=model, **kwargs)
         self.lambda_coef = lambda_coef
         self.lambda_coef_reg = lambda_coef_reg
         self.temperature = temperature
         self.use_kl = use_kl
         self.use_mse = use_mse
+        self.base_model_path = base_model_path
 
     def compute_loss(self, merged_model, inputs,return_outputs=False):
         # Ensure the merged_model is on the correct device
@@ -88,3 +96,30 @@ class DAMTrainer(Trainer):
 
         return (total_loss, merged_logits) if return_outputs else total_loss
     
+    def save_model(self, output_dir=None):
+        """
+        Save the model and tokenizer to the specified directory.
+        """
+        if output_dir is None:
+            output_dir = self.args.output_dir
+
+        # Initialize a new model with the same architecture as the base model
+        new_model = AutoModelForCausalLM.from_pretrained(self.base_model_path, torch_dtype=torch.bfloat16)
+
+        # Iterate through all modules and update weights for DAMLinearLayers
+        for (name, module), (_, new_module) in tqdm(zip(self.model.named_modules(), new_model.named_modules()), 
+                                                    desc="Merging layers"):
+            if isinstance(module, DAMLinearLayer):
+                # Get the merged weight and bias
+                merged_weight = module.get_dam_weight()
+                merged_bias = module.get_dam_bias()
+                
+                # Update the weights and bias of the corresponding layer in the new model
+                new_module.weight.data = merged_weight
+                if merged_bias is not None:
+                    new_module.bias.data = merged_bias
+
+        # Save the new model
+        new_model.save_pretrained(output_dir)
+        self.tokenizer.save_pretrained(output_dir)
+        print(f"Merged model saved successfully at {output_dir}!")
