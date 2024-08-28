@@ -117,4 +117,4 @@ if __name__ == "__main__":
     main()
 
 
-# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 GAIR/Abel-7B-002 --device cuda --output_path /workspace/merged_model
+# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/Wiza.rdMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path /workspace/merged_model
