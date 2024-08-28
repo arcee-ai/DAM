@@ -59,31 +59,22 @@ class DAMBaseLayer(nn.Module):
     
         return similarity_loss
 
-    # # Method to compute L2 regularization on the merging coefficients
-    # def compute_mergers_L2_reg(self, lambda_coef_reg=None):
-    #     l2_reg = torch.tensor(0.0)
-    #     if lambda_coef_reg is not None:
-    #         # Calculate L2 norm for each merging coefficient and sum them
-    #         l2_reg += (
-    #             self.merger_1.norm(2) +
-    #             self.merger_2.norm(2) +
-    #             self.merger_3.norm(2)
-    #         ) * lambda_coef_reg
+    # Method to compute L1 and L2 regularization on the merging coefficients
+    def compute_mergers_L1_L2_reg(self, lambda_coef_l1=None, lambda_coef_l2=None):
+        device = self.mergers[0].device
+        l1_reg = torch.tensor(0.0, device=device)
+        l2_reg = torch.tensor(0.0, device=device)
 
-    #     return l2_reg
+        # Calculate L1 norm for each merging coefficient in the ParameterList and sum them
+        if lambda_coef_l1 is not None:
+            l1_reg += sum(merger.norm(1).to(device) for merger in self.mergers) * lambda_coef_l1
 
-    # Method to compute L2 regularization on the merging coefficients
-    def compute_mergers_L2_reg(self, lambda_coef_reg=None):
-        if lambda_coef_reg is None:
-            return torch.tensor(0.0, device=self.mergers[0].device)
-
-        # Initialize l2_reg on the same device as the mergers
-        l2_reg = torch.tensor(0.0, device=self.mergers[0].device)
-        
         # Calculate L2 norm for each merging coefficient in the ParameterList and sum them
-        l2_reg += sum(merger.norm(2).to(self.mergers[0].device) for merger in self.mergers) * lambda_coef_reg
+        if lambda_coef_l2 is not None:
+            l2_reg += sum(merger.norm(2).to(device) for merger in self.mergers) * lambda_coef_l2
 
-        return l2_reg
+        # Return the combined L1 and L2 regularization loss
+        return l1_reg + l2_reg
 
 
     # Method to unfreeze the merging coefficients so they can be trained

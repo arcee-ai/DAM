@@ -10,14 +10,17 @@ from transformers import Trainer
 
 class DAMTrainer(Trainer):
     def __init__(self, model, lambda_coef=0.01, 
-                 lambda_coef_reg=0.01, 
-                 temperature=2.0, use_kl=True, 
+                 lambda_coef_l1=None,  # Added L1 regularization coefficient
+                 lambda_coef_l2=0.01,  # Added L2 regularization coefficient
+                 temperature=2.0, 
+                 use_kl=True, 
                  use_mse=False, 
                  base_model_path=None, 
                  **kwargs):
         super().__init__(model=model, **kwargs)
         self.lambda_coef = lambda_coef
-        self.lambda_coef_reg = lambda_coef_reg
+        self.lambda_coef_l1 = lambda_coef_l1  # Initialize L1 regularization coefficient
+        self.lambda_coef_l2 = lambda_coef_l2  # Initialize L2 regularization coefficient
         self.temperature = temperature
         self.use_kl = use_kl
         self.use_mse = use_mse
@@ -85,14 +88,17 @@ class DAMTrainer(Trainer):
 
         # Compute similarity loss and L2 regularization for merging coefficients
         similarity_loss = torch.tensor(0.0, device=device)
-        l2_reg = torch.tensor(0.0, device=device)
+        l1_l2_reg = torch.tensor(0.0, device=device)
         for module in merged_model.modules():
             if hasattr(module, 'compute_mergers_similarity'):
                 similarity_loss += module.compute_mergers_similarity(self.lambda_coef).to(similarity_loss.device)
             if hasattr(module, 'compute_mergers_L2_reg'):
-                l2_reg += module.compute_mergers_L2_reg(self.lambda_coef_reg).to(l2_reg.device)
+                l1_l2_reg += module.compute_mergers_L1_L2_reg(
+                    lambda_coef_l1=self.lambda_coef_l1, 
+                    lambda_coef_l2=self.lambda_coef_l2
+                ).to(l1_l2_reg.device)
 
-        total_loss += similarity_loss + l2_reg
+        total_loss += similarity_loss + l1_l2_reg
 
         return (total_loss, merged_logits) if return_outputs else total_loss
     
