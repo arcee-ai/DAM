@@ -7,12 +7,14 @@ from utils import find_linear_layers, find_embedding_layers
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from glom import glom, Assign
 from tqdm import tqdm
+from huggingface_hub import HfApi
 
 def fix_config(save_path, num_models, non_linearity):
+
     config_path = os.path.join(save_path, 'config.json')
     with open(config_path, 'r') as file:
         data = json.load(file)
-        
+
     if data['model_type'] == "mistral":
         data['model_type'] = "mergedmistral"
         data['architectures'][0] = 'MergedMistralForCausalLM'
@@ -21,12 +23,15 @@ def fix_config(save_path, num_models, non_linearity):
         data['architectures'][0] = 'MergedLlamaForCausalLM'
 
     data['num_merged_models'] = num_models
-    data['non_linearity'] = non_linearity  # Add non_linearity to config
+    data['non_linearity'] = non_linearity
 
     with open(config_path, 'w') as file:
         json.dump(data, file, indent=2)
 
+    return config_path  # Return the updated config
+
 def merge_models(base_model_id, model_ids, output_path, device, use_base_model, non_linearity):
+
     print(f"Loading base model: {base_model_id}")
     merged_model = AutoModelForCausalLM.from_pretrained(base_model_id, torch_dtype=torch.bfloat16, device_map=device)
 
@@ -94,11 +99,20 @@ def merge_models(base_model_id, model_ids, output_path, device, use_base_model, 
     merged_model.save_pretrained(output_path)
     tokenizer.save_pretrained(output_path)
 
-    # push to the hub
-    # tokenizer.push_to_hub("arcee-ai/pplist-merged-untrained")
-    #merged_model.push_to_hub("arcee-train/pplist-merged-untrained")
+    fixed_config_path = fix_config(output_path, num_models=len(models), non_linearity=non_linearity)
 
-    fix_config(output_path, num_models=len(models), non_linearity=non_linearity)
+    # push to the hub
+    tokenizer.push_to_hub("arcee-ai/pplist-merged-untrained")
+    merged_model.push_to_hub("arcee-train/pplist-merged-untrained-with-base")
+
+    # Upload the fixed config file to the hub
+    api = HfApi()
+    api.upload_file(
+        path_or_fileobj=fixed_config_path,
+        path_in_repo="config.json",
+        repo_id="arcee-train/pplist-merged-untrained-with-base",
+        repo_type="model",
+    )
 
     print(f"Merge complete. Merged model saved to {output_path}")
 
@@ -116,13 +130,13 @@ def main():
     merge_models(args.base_model_id, args.model_ids, args.output_path, args.device, args.use_base_model, args.non_linearity)
 
 if __name__ == "__main__":
-    os.environ['HF_TOKEN'] = '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'
-    os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
-    os.environ['HF_HOME'] = '/workspace/hf-cache'
+    # os.environ['HF_TOKEN'] = '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'
+    # os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
+    # os.environ['HF_HOME'] = '/workspace/hf-cache'
 
     # Model and dataset details
-    cache_dir = "/workspace/hf-cache"
+    # cache_dir = "/workspace/hf-cache"
     main()
 
 
-# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/Wiza.rdMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path /workspace/merged_model --use_base_model --non_linearity tanh
+# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path /workspace/merged_model --use_base_model --non_linearity tanh
