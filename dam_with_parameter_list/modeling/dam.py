@@ -14,11 +14,15 @@ class DAMBaseLayer(nn.Module):
         num_models=3,
         init_merger_values=[],
         dtype=None,
+        use_tanh: bool = False,  # Option to apply tanh non-linearity
     ):
         super().__init__()
 
         # Store the number of models being merged
         self.num_models = num_models
+
+        # Store whether to use tanh on the merging coefficients
+        self.use_tanh = use_tanh
 
         # If no initial values are provided, set equal initial merger values for each model
         if init_merger_values == []:
@@ -91,7 +95,8 @@ class DAMLinearLayer(DAMBaseLayer):
         num_models=3,
         bias: bool=False,
         init_merger_values=[],
-        dtype=None
+        dtype=None,
+        use_tanh: bool = False,  # Option to apply tanh non-linearity
     ):
         super().__init__(
             in_features=in_features,
@@ -99,6 +104,7 @@ class DAMLinearLayer(DAMBaseLayer):
             num_models=num_models,
             init_merger_values=init_merger_values,
             dtype=dtype,
+            use_tanh=use_tanh,
         )
 
         # If no initial values are provided, set equal initial merger values for each model
@@ -113,15 +119,19 @@ class DAMLinearLayer(DAMBaseLayer):
     # Method to compute the combined weight for the merged layer
     def get_dam_weight(self):
         device = self.mergers[0].device
-        # Sum the weighted contributions of each model's weight using the merging coefficients
-        return sum(merger.to(device) * weight.to(device) for merger, weight in zip(self.weights, self.mergers))
+        # Apply tanh to the merging coefficients if use_tanh is True
+        constrained_mergers = [torch.tanh(merger) if self.use_tanh else merger for merger in self.mergers]
+        # Sum the weighted contributions of each model's weight using the (possibly constrained) merging coefficients
+        return sum(merger.to(device) * weight.to(device) for merger, weight in zip(constrained_mergers, self.weights))
     
     # Method to compute the combined bias for the merged layer (if bias is used)
     def get_dam_bias(self):
-        if hasattr(self, 'bias_0'):
+        if hasattr(self, 'biases'):
             device = self.bias_mergers[0].device
-            # Sum the weighted contributions of each model's bias using the bias merging coefficients
-            return sum(merger.to(device) * bias.to(device) for merger, bias in zip(self.bias_mergers, self.biases))
+            # Apply tanh to the bias merging coefficients if use_tanh is True
+            constrained_bias_mergers = [torch.tanh(merger) if self.use_tanh else merger for merger in self.bias_mergers]
+            # Sum the weighted contributions of each model's bias using the (possibly constrained) bias merging coefficients
+            return sum(merger.to(device) * bias.to(device) for merger, bias in zip(constrained_bias_mergers, self.biases))
         return None
 
     # Forward pass through the DAMLinearLayer
