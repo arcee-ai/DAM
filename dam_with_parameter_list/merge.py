@@ -26,12 +26,16 @@ def fix_config(save_path, num_models):
     with open(config_path, 'w') as file:
         json.dump(data, file, indent=2)
 
-def merge_models(base_model_id, model_ids, output_path, device):
+def merge_models(base_model_id, model_ids, output_path, device, use_base_model):
     print(f"Loading base model: {base_model_id}")
     merged_model = AutoModelForCausalLM.from_pretrained(base_model_id, torch_dtype=torch.bfloat16, device_map=device)
 
     print("Loading models to merge:")
     models = [AutoModelForCausalLM.from_pretrained(model_id, torch_dtype=torch.bfloat16, device_map=device) for model_id in tqdm(model_ids, desc="Loading models")]
+
+    # If use_base_model is True, append the base model to the models list
+    if use_base_model:
+        models.append(merged_model)
 
     tokenizer = AutoTokenizer.from_pretrained(base_model_id, use_fast=True)
 
@@ -104,10 +108,11 @@ def main():
     parser.add_argument("model_ids", nargs='+', help="IDs of the models to merge (for linear layers)")
     parser.add_argument("--output_path", help="Path to save the merged model")
     parser.add_argument("--device", default="cpu", help="Device to use for computation (e.g., 'cpu', 'cuda')")
+    parser.add_argument("--use_base_model", action='store_true', help="Include base model's linear layers in the merging process")
 
     args = parser.parse_args()
 
-    merge_models(args.base_model_id, args.model_ids, args.output_path, args.device)
+    merge_models(args.base_model_id, args.model_ids, args.output_path, args.device, args.use_base_model)
 
 if __name__ == "__main__":
     os.environ['HF_TOKEN'] = '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'
@@ -119,4 +124,4 @@ if __name__ == "__main__":
     main()
 
 
-# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/Wiza.rdMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path /workspace/merged_model
+# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/Wiza.rdMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path /workspace/merged_model --use_base_model
