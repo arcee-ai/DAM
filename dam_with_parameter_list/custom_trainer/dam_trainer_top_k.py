@@ -3,10 +3,22 @@ import torch.nn.functional as F
 from transformers import Trainer, AutoModelForCausalLM
 from modeling.dam import DAMLinearLayer
 from tqdm import tqdm
+try:
+    import wandb
+except:
+    pass
 
-import torch
-import torch.nn.functional as F
-from transformers import Trainer
+def entropy_loss(logits, temperature=1.0):
+    probabilities = F.softmax(logits / temperature, dim=-1)
+    entropy_loss = -torch.sum(probabilities * torch.log(probabilities + 1e-9), dim=-1).mean()
+    return entropy_loss * (temperature ** 2) / logits.size(1)
+
+def kl_divergence_loss(logits, target_logits, temperature=1.0):
+    return F.kl_div(
+            F.log_softmax(logits / temperature, dim=-1),
+            F.softmax(target_logits / temperature, dim=-1),
+            reduction='batchmean'
+            ) * (temperature ** 2) / logits.size(1) 
 
 class DAMTrainer(Trainer):
     def __init__(self, model, lambda_coef=0.01, 
@@ -15,16 +27,22 @@ class DAMTrainer(Trainer):
                  temperature=2.0, 
                  use_kl=True, 
                  use_mse=False, 
+                 use_entropy=False,
                  base_model_path=None, 
+                 use_wandb=False,
                  **kwargs):
         super().__init__(model=model, **kwargs)
         self.lambda_coef = lambda_coef
         self.lambda_coef_l1 = lambda_coef_l1  # Initialize L1 regularization coefficient
         self.lambda_coef_l2 = lambda_coef_l2  # Initialize L2 regularization coefficient
         self.temperature = temperature
+
         self.use_kl = use_kl
         self.use_mse = use_mse
+        self.use_entropy = use_entropy
+
         self.base_model_path = base_model_path
+        self.use_wandb = use_wandb
 
     def compute_loss(self, merged_model, inputs,return_outputs=False):
         # Ensure the merged_model is on the correct device
@@ -51,40 +69,31 @@ class DAMTrainer(Trainer):
             merged_logits_dict[f'merged_logits_{i}'] = merged_logits
         
         total_loss = 0.0
-        
+        loss_logs = {}
         # Compute KL divergence loss between the merged model's logits and each corresponding top-K logits
-        if self.use_kl:
-            for i in range(1, num_inputs + 1):
-                merged_logits = merged_logits_dict[f'merged_logits_{i}']
-                topk_logits = inputs[f'topk_logits_model_{i}'].to(device)
-                topk_indices = inputs[f'topk_indices_model_{i}'].to(device)
-                
-                # Gather the logits corresponding to the top-K indices
-                gathered_merged_logits = torch.gather(merged_logits, dim=-1, index=topk_indices)
+        for i in range(1, num_inputs + 1):
+            merged_logits = merged_logits_dict[f'merged_logits_{i}']
+            topk_logits = inputs[f'topk_logits_model_{i}'].to(device)
+            topk_indices = inputs[f'topk_indices_model_{i}'].to(device)
+            
+            # Gather the logits corresponding to the top-K indices
+            gathered_merged_logits = torch.gather(merged_logits, dim=-1, index=topk_indices)
 
+            if self.use_kl:
                 # Calculate the KL divergence loss with normalization by the input length
-                kl_loss = F.kl_div(
-                    F.log_softmax(gathered_merged_logits / self.temperature, dim=-1),
-                    F.softmax(topk_logits / self.temperature, dim=-1),
-                    reduction='batchmean'
-                ) * (self.temperature ** 2) / gathered_merged_logits.size(1)
-                
+                kl_loss = kl_divergence_loss(gathered_merged_logits, topk_logits, temperature=self.temperature)
+                loss_logs[f'kl_loss'] = kl_loss
                 total_loss += kl_loss
-        
-        # Compute MSE loss between the merged model's logits and each corresponding top-K logits
-        if self.use_mse:
-            for i in range(1, num_inputs + 1):
-                merged_logits = merged_logits_dict[f'merged_logits_{i}']
-                topk_logits = inputs[f'topk_logits_model_{i}'].to(device)
-                topk_indices = inputs[f'topk_indices_model_{i}'].to(device)
-                
-                # Gather the logits corresponding to the top-K indices
-                gathered_merged_logits = torch.gather(merged_logits, dim=-1, index=topk_indices)
 
-                # Calculate the MSE loss
+            if self.use_mse:
                 mse_loss = F.mse_loss(gathered_merged_logits, topk_logits, reduction='mean')
-                
+                loss_logs[f'mse_loss'] = mse_loss
                 total_loss += mse_loss
+
+            if self.use_entropy:
+                e_loss = entropy_loss(merged_logits, temperature=self.temperature)
+                loss_logs[f'entropy_loss'] = e_loss
+                total_loss += e_loss
 
         # Compute similarity loss and L2 regularization for merging coefficients
         similarity_loss = torch.tensor(0.0, device=device)
@@ -98,7 +107,13 @@ class DAMTrainer(Trainer):
                     lambda_coef_l2=self.lambda_coef_l2
                 ).to(l1_l2_reg.device)
 
+        loss_logs['similarity_loss'] = similarity_loss
+        loss_logs['l1_l2_reg'] = l1_l2_reg
+
         total_loss += similarity_loss + l1_l2_reg
+
+        if self.use_wandb:
+            wandb.log(loss_logs)
 
         return (total_loss, merged_logits) if return_outputs else total_loss
     
