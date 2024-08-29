@@ -7,6 +7,7 @@ from data_preprocessing import preprocess_data  # Assuming this function is in d
 
 from torch.utils.data import DataLoader
 from transformers import default_data_collator
+import click
 
 # Environment variables
 os.environ['HF_TOKEN'] = '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' #'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'
@@ -73,7 +74,9 @@ def compute_and_save_topk_logits(models_dict, tokenized_dataset, device, batch_s
 
     return tokenized_dataset
 
-def main():
+@click.command()
+@click.option("--k", type=int, default=50, help="Number of top logits to keep.")
+def main(k):
     # Environment variables
     os.environ['HF_TOKEN'] = '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'
     os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
@@ -100,7 +103,7 @@ def main():
     combined_dataset, tokenizer = preprocess_data(templated_datasets, base_model_name, cache_dir)
 
     # Select only 10 examples for testing
-    combined_dataset = combined_dataset.select(range(100))
+    # combined_dataset = combined_dataset.select(range(100))
 
     # Load additional models
     model_ids = [
@@ -112,12 +115,12 @@ def main():
 
     # Compute logits for each model and input set and save as additional columns
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    combined_dataset_with_top_k_logits = compute_and_save_topk_logits(models_dict, combined_dataset, device, batch_size=4, top_k=50)
+    combined_dataset_with_top_k_logits = compute_and_save_topk_logits(models_dict, combined_dataset, device, batch_size=4, top_k=k)
 
     print(combined_dataset_with_top_k_logits)
 
     # Save the dataset with logits to disk
-    combined_dataset_with_top_k_logits.save_to_disk("./dataset_with_logits")
+    combined_dataset_with_top_k_logits.save_to_disk(f"./dataset_with_logits_k_{k}")
 
     # Push to hub
     # combined_dataset_with_top_k_logits.push_to_hub("arcee-train/logits-dataset-mock")
