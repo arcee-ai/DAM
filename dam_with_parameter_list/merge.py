@@ -8,7 +8,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from glom import glom, Assign
 from tqdm import tqdm
 
-def fix_config(save_path, num_models):
+def fix_config(save_path, num_models, non_linearity):
     config_path = os.path.join(save_path, 'config.json')
     with open(config_path, 'r') as file:
         data = json.load(file)
@@ -21,12 +21,12 @@ def fix_config(save_path, num_models):
         data['architectures'][0] = 'MergedLlamaForCausalLM'
 
     data['num_merged_models'] = num_models
-    data['use_tanh'] = False  # Add this line to set use_tanh to False
+    data['non_linearity'] = non_linearity  # Add non_linearity to config
 
     with open(config_path, 'w') as file:
         json.dump(data, file, indent=2)
 
-def merge_models(base_model_id, model_ids, output_path, device, use_base_model):
+def merge_models(base_model_id, model_ids, output_path, device, use_base_model, non_linearity):
     print(f"Loading base model: {base_model_id}")
     merged_model = AutoModelForCausalLM.from_pretrained(base_model_id, torch_dtype=torch.bfloat16, device_map=device)
 
@@ -62,7 +62,7 @@ def merge_models(base_model_id, model_ids, output_path, device, use_base_model):
             num_models=len(models),
             bias=modules[0].bias is not None,
             dtype=modules[0].weight.dtype,
-            use_tanh=False  # Add this parameter to set use_tanh to False
+            non_linearity=non_linearity  # Set non_linearity based on user input
         ).to(device)
 
 
@@ -98,7 +98,7 @@ def merge_models(base_model_id, model_ids, output_path, device, use_base_model):
     # tokenizer.push_to_hub("arcee-ai/pplist-merged-untrained")
     #merged_model.push_to_hub("arcee-train/pplist-merged-untrained")
 
-    fix_config(output_path, num_models=len(models))
+    fix_config(output_path, num_models=len(models), non_linearity=non_linearity)
 
     print(f"Merge complete. Merged model saved to {output_path}")
 
@@ -109,10 +109,11 @@ def main():
     parser.add_argument("--output_path", help="Path to save the merged model")
     parser.add_argument("--device", default="cpu", help="Device to use for computation (e.g., 'cpu', 'cuda')")
     parser.add_argument("--use_base_model", action='store_true', help="Include base model's linear layers in the merging process")
+    parser.add_argument("--non_linearity", choices=['tanh', 'sigmoid', 'relu', None], default=None, help="Non-linearity to use in DAMLinearLayer")
 
     args = parser.parse_args()
 
-    merge_models(args.base_model_id, args.model_ids, args.output_path, args.device, args.use_base_model)
+    merge_models(args.base_model_id, args.model_ids, args.output_path, args.device, args.use_base_model, args.non_linearity)
 
 if __name__ == "__main__":
     os.environ['HF_TOKEN'] = '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'
@@ -124,4 +125,4 @@ if __name__ == "__main__":
     main()
 
 
-# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/Wiza.rdMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path /workspace/merged_model --use_base_model
+# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/Wiza.rdMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path /workspace/merged_model --use_base_model --non_linearity tanh

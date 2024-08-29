@@ -14,15 +14,15 @@ class DAMBaseLayer(nn.Module):
         num_models=3,
         init_merger_values=[],
         dtype=None,
-        use_tanh: bool = False,  # Option to apply tanh non-linearity
+        non_linearity: str = 'tanh',  # Option to apply non-linearity
     ):
         super().__init__()
 
         # Store the number of models being merged
         self.num_models = num_models
 
-        # Store whether to use tanh on the merging coefficients
-        self.use_tanh = use_tanh
+        # Store the non-linearity to be applied on the merging coefficients
+        self.non_linearity = non_linearity
 
         # If no initial values are provided, set equal initial merger values for each model
         if init_merger_values == []:
@@ -96,7 +96,7 @@ class DAMLinearLayer(DAMBaseLayer):
         bias: bool=False,
         init_merger_values=[],
         dtype=None,
-        use_tanh: bool = False,  # Option to apply tanh non-linearity
+        non_linearity: str = 'tanh',  # Option to apply non-linearity
     ):
         super().__init__(
             in_features=in_features,
@@ -104,7 +104,7 @@ class DAMLinearLayer(DAMBaseLayer):
             num_models=num_models,
             init_merger_values=init_merger_values,
             dtype=dtype,
-            use_tanh=use_tanh,
+            non_linearity=non_linearity,
         )
 
         # If no initial values are provided, set equal initial merger values for each model
@@ -116,11 +116,21 @@ class DAMLinearLayer(DAMBaseLayer):
             self.biases = nn.ParameterList([nn.Parameter(torch.zeros(out_features, dtype=dtype) * init_merger_values[i]) for i in range(num_models)])
             self.bias_mergers = nn.ParameterList([nn.Parameter(torch.ones(1, dtype=dtype) * init_merger_values[i]) for i in range(num_models)])
 
+    # Method to apply the specified non-linearity to the merging coefficients
+    def apply_non_linearity(self, tensor):
+        if self.non_linearity == 'tanh':
+            return torch.tanh(tensor)
+        elif self.non_linearity == 'sigmoid':
+            return torch.sigmoid(tensor)
+        elif self.non_linearity == 'relu':
+            return torch.relu(tensor)
+        else:
+            return tensor  # If non_linearity is None or unsupported, return the tensor as is
+
     # Method to compute the combined weight for the merged layer
     def get_dam_weight(self):
         device = self.mergers[0].device
-        # Apply tanh to the merging coefficients if use_tanh is True
-        constrained_mergers = [torch.tanh(merger) if self.use_tanh else merger for merger in self.mergers]
+        constrained_mergers = [self.apply_non_linearity(merger) for merger in self.mergers] if self.non_linearity else self.mergers
         # Sum the weighted contributions of each model's weight using the (possibly constrained) merging coefficients
         return sum(merger.to(device) * weight.to(device) for merger, weight in zip(constrained_mergers, self.weights))
     
@@ -128,8 +138,7 @@ class DAMLinearLayer(DAMBaseLayer):
     def get_dam_bias(self):
         if hasattr(self, 'biases'):
             device = self.bias_mergers[0].device
-            # Apply tanh to the bias merging coefficients if use_tanh is True
-            constrained_bias_mergers = [torch.tanh(merger) if self.use_tanh else merger for merger in self.bias_mergers]
+            constrained_bias_mergers = [self.apply_non_linearity(merger) for merger in self.bias_mergers] if self.non_linearity else self.bias_mergers
             # Sum the weighted contributions of each model's bias using the (possibly constrained) bias merging coefficients
             return sum(merger.to(device) * bias.to(device) for merger, bias in zip(constrained_bias_mergers, self.biases))
         return None
