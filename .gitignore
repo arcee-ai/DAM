@@ -1,0 +1,6 @@
+/env
+*__pycache__*
+*/__pycache__/*
+merged_model
+*/dataset_with_logits
+*wandb*
