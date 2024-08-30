@@ -8,17 +8,44 @@ try:
 except:
     pass
 
-def entropy_loss(logits, temperature=1.0):
-    probabilities = F.softmax(logits / temperature, dim=-1)
-    entropy_loss = -torch.sum(probabilities * torch.log(probabilities + 1e-9), dim=-1).mean()
-    return entropy_loss * (temperature ** 2) / logits.size(1)
+def kl_divergence_loss(logits, target_logits, non_padded_tokens, temperature=1.0):
+    # Compute the KL divergence between the log-softmax of logits and the softmax of target_logits
+    kl_div = F.kl_div(
+        F.log_softmax(logits / temperature, dim=-1),
+        F.softmax(target_logits / temperature, dim=-1),
+        reduction='batchmean'
+    )
+    
+    # Scale the KL divergence by the temperature squared
+    scaled_kl_div = kl_div * (temperature ** 2)
+    
+    # Normalize by the number of non-padded tokens
+    normalized_kl_div = scaled_kl_div / non_padded_tokens
+    
+    return normalized_kl_div
 
-def kl_divergence_loss(logits, target_logits, temperature=1.0):
-    return F.kl_div(
-            F.log_softmax(logits / temperature, dim=-1),
-            F.softmax(target_logits / temperature, dim=-1),
-            reduction='batchmean'
-            ) * (temperature ** 2) / logits.size(1) 
+def entropy_loss(logits, non_padded_tokens, temperature=1.0):
+    # Apply softmax to the logits
+    probabilities = F.softmax(logits / temperature, dim=-1)
+    
+    # Compute the entropy
+    entropy = -torch.sum(probabilities * torch.log(probabilities + 1e-9), dim=-1)
+    
+    # Mask out the padding tokens in the entropy
+    masked_entropy = entropy * attention_mask
+    
+    # Compute the total entropy loss, considering only non-padded tokens
+    total_entropy_loss = masked_entropy.sum() * (temperature ** 2)
+    
+    # Normalize by the number of non-padded tokens
+    return total_entropy_loss / non_padded_tokens
+
+def mse_loss(logits, target_logits, non_padded_tokens):
+    # Compute the MSE loss
+    mse_loss = F.mse_loss(logits, target_logits, reduction='sum')
+    
+    # Normalize by the number of non-padded tokens
+    return mse_loss / non_padded_tokens
 
 class DAMTrainer(Trainer):
     def __init__(self, model, lambda_coef=0.01, 
@@ -75,23 +102,39 @@ class DAMTrainer(Trainer):
             merged_logits = merged_logits_dict[f'merged_logits_{i}']
             topk_logits = inputs[f'topk_logits_model_{i}'].to(device)
             topk_indices = inputs[f'topk_indices_model_{i}'].to(device)
-            
+            attention_mask = attention_mask_dict[f'attention_mask_{i}']
+
+            # Calculate the number of non-padded tokens once
+            non_padded_tokens = attention_mask.sum().item()
+
+            # Mask out the padding tokens in the logits
+            masked_merged_logits = merged_logits * attention_mask.unsqueeze(-1)
+            masked_topk_taget_logits = topk_logits * attention_mask.unsqueeze(-1)
+          
             # Gather the logits corresponding to the top-K indices
-            gathered_merged_logits = torch.gather(merged_logits, dim=-1, index=topk_indices)
+            gathered_masked_merged_logits = torch.gather(masked_merged_logits, dim=-1, index=topk_indices)
 
             if self.use_kl:
                 # Calculate the KL divergence loss with normalization by the input length
-                kl_loss = kl_divergence_loss(gathered_merged_logits, topk_logits, temperature=self.temperature)
+                kl_loss = kl_divergence_loss(gathered_masked_merged_logits, 
+                                            masked_topk_taget_logits, 
+                                            non_padded_tokens, 
+                                            temperature=self.temperature)
                 loss_logs[f'kl_loss'] = kl_loss
                 total_loss += kl_loss
 
             if self.use_mse:
-                mse_loss = F.mse_loss(gathered_merged_logits, topk_logits, reduction='mean')
-                loss_logs[f'mse_loss'] = mse_loss
-                total_loss += mse_loss
+                mse_loss_value = mse_loss(gathered_merged_logits,
+                                          masked_topk_taget_logits, 
+                                          non_padded_tokens
+                                          )
+                loss_logs[f'mse_loss'] = mse_loss_value
+                total_loss += mse_loss_value
 
             if self.use_entropy:
-                e_loss = entropy_loss(merged_logits, temperature=self.temperature)
+                e_loss = entropy_loss(masked_merged_logits, 
+                                      non_padded_tokens, 
+                                      temperature=self.temperature)
                 loss_logs[f'entropy_loss'] = e_loss
                 total_loss += e_loss
 

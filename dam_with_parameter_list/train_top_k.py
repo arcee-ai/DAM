@@ -10,16 +10,16 @@ import click
 import wandb
 
 # Environment variables
-os.environ['HF_TOKEN'] = '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'
+os.environ['HF_TOKEN'] = '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'
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
-os.environ['HF_HOME'] = '/workspace/hf-cache'
+os.environ['HF_HOME'] = '/home/ec2-user/.cache/huggingface'
 
 # Command line arguments allow for WandB Sweep
 @click.command()
 @click.option("--temperature", default=2.0)
-@click.option("--weight_decay", default=0.005)
-@click.option("--learning_rate", default=1e-3)
-@click.option("--lr_scheduler_type", default="constant")
+@click.option("--weight_decay", default=0.01)
+@click.option("--learning_rate", default=1e-4)
+@click.option("--lr_scheduler_type", default="cosine")
 @click.option("--use_kl", default=True)
 @click.option("--use_mse", default=False)
 @click.option("--use_entropy", default=False)
@@ -31,16 +31,16 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
          lambda_coef, lambda_coef_l1, lambda_coef_l2):
     # Model and dataset details
     base_model_name = "mistralai/Mistral-7B-v0.1" 
-    model_name = "arcee-train/pplist-merged-untrained"
-    cache_dir = "/workspace/hf-cache"
-    hf_disk_dataset_dir = "arcee-train/logits-dataset-mock"
+    model_name = "/home/ec2-user/shamane/ZipLoRA/dam_with_parameter_list/merged_model"
+    cache_dir = "/home/ec2-user/.cache/huggingface"
+    hf_disk_dataset_dir = "/home/ec2-user/shamane/ZipLoRA/dam_with_parameter_list/dataset_with_logits"
 
     # Setup tokenizer
     tokenizer = AutoTokenizer.from_pretrained(base_model_name, use_fast=True, cache_dir=cache_dir)
 
     # Load the dataset from disk
-    #dataset = load_from_disk(hf_disk_dataset_dir)
-    dataset = load_dataset(hf_disk_dataset_dir, split="train")
+    dataset = load_from_disk(hf_disk_dataset_dir)
+    #dataset = load_dataset(hf_disk_dataset_dir, split="train")
 
     # Prepare the model
     model = prepare_model(model_name, cache_dir)
@@ -56,7 +56,7 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
         per_device_eval_batch_size=1,
         num_train_epochs=1,
         weight_decay=weight_decay,
-        lr_scheduler_type=learning_rate,
+        lr_scheduler_type=lr_scheduler_type,
         bf16=True,
         push_to_hub=False,
         remove_unused_columns=False,
@@ -64,7 +64,8 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
         logging_steps=1,
         logging_strategy="steps",
         report_to="wandb",
-        gradient_accumulation_steps=1
+        gradient_accumulation_steps=1,
+        max_grad_norm=1.0
     )
 
     
