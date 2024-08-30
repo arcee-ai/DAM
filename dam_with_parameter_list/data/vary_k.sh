@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the values of k
-k_values=(10 50 100)
+k_values=(8 32 64 128)
 
 # Loop through the k values and run the script
 for k in "${k_values[@]}"

@@ -2,5 +2,5 @@
 *__pycache__*
 */__pycache__/*
 merged_model
-*/dataset_with_logits
+*dataset_with_logits*
 *wandb*

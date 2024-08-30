@@ -8,6 +8,7 @@ from data_preprocessing import preprocess_data  # Assuming this function is in d
 from torch.utils.data import DataLoader
 from transformers import default_data_collator
 import click
+from tqdm import tqdm
 
 # Environment variables
 os.environ['HF_TOKEN'] = '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' #'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'
@@ -46,7 +47,7 @@ def compute_and_save_topk_logits(models_dict, tokenized_dataset, device, batch_s
     Returns:
         Dataset: The updated dataset with top-K logits and their indices added as columns.
     """
-    for idx, (model_key, model) in enumerate(models_dict.items(), start=1):
+    for idx, (model_key, model) in tqdm(enumerate(models_dict.items(), start=1), desc="Model", leave=True):
         model = model.to(device)  # Ensure model is on the correct device
         model.eval()  # Set model to evaluation mode
 
@@ -56,7 +57,7 @@ def compute_and_save_topk_logits(models_dict, tokenized_dataset, device, batch_s
         # Create a DataLoader for the dataset with the specified batch size
         dataloader = DataLoader(tokenized_dataset, batch_size=batch_size, collate_fn=default_data_collator)
 
-        for batch in dataloader:
+        for batch in tqdm(dataloader, desc="Batch", leave=False):
             input_ids = batch[f'input_ids_{idx}'].to(device)
             attention_mask = batch[f'attention_mask_{idx}'].to(device)
             
@@ -75,7 +76,7 @@ def compute_and_save_topk_logits(models_dict, tokenized_dataset, device, batch_s
     return tokenized_dataset
 
 @click.command()
-@click.option("--k", type=int, default=50, help="Number of top logits to keep.")
+@click.option("--k", type=int, default=128, help="Number of top logits to keep.")
 def main(k):
     # Environment variables
     os.environ['HF_TOKEN'] = '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'
@@ -102,9 +103,6 @@ def main(k):
     # Data preprocessing
     combined_dataset, tokenizer = preprocess_data(templated_datasets, base_model_name, cache_dir)
 
-    # Select only 10 examples for testing
-    # combined_dataset = combined_dataset.select(range(100))
-
     # Load additional models
     model_ids = [
         "augmxnt/shisa-gamma-7b-v1",
@@ -120,10 +118,7 @@ def main(k):
     print(combined_dataset_with_top_k_logits)
 
     # Save the dataset with logits to disk
-    combined_dataset_with_top_k_logits.save_to_disk(f"./dataset_with_logits_k_{k}")
-
-    # Push to hub
-    # combined_dataset_with_top_k_logits.push_to_hub("arcee-train/logits-dataset-mock")
+    combined_dataset_with_top_k_logits.save_to_disk(f"./DAM_logits_k_{k}")
 
 if __name__ == "__main__":
     main()
