@@ -173,11 +173,13 @@ class DAMTrainer(Trainer):
         # Iterate through all modules and update weights for DAMLinearLayers
         for (name, module), (_, new_module) in tqdm(zip(self.model.named_modules(), new_model.named_modules()), 
                                                     desc="Merging layers"):
-            if isinstance(module, DAMLinearLayer):
+            if isinstance(module, DAMLinearLayer) and isinstance(new_module, torch.nn.Linear):
                 # Get the merged weight and bias
-                merged_weight = module.get_dam_weight()
+                merged_weight = module.get_dam_weight().to(new_module.weight.device)
                 merged_bias = module.get_dam_bias()
-                
+                if merged_bias is not None:
+                    merged_bias = merged_bias.to(new_module.bias.device)
+
                 # Update the weights and bias of the corresponding layer in the new model
                 new_module.weight.data = merged_weight
                 if merged_bias is not None:
