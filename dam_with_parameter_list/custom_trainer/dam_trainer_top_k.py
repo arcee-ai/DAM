@@ -24,7 +24,7 @@ def kl_divergence_loss(logits, target_logits, non_padded_tokens, temperature=1.0
     
     return normalized_kl_div
 
-def entropy_loss(logits, non_padded_tokens, temperature=1.0):
+def entropy_loss(logits, attention_mask, non_padded_tokens temperature=1.0):
     # Apply softmax to the logits
     probabilities = F.softmax(logits / temperature, dim=-1)
     
@@ -47,6 +47,48 @@ def mse_loss(logits, target_logits, non_padded_tokens):
     # Normalize by the number of non-padded tokens
     return mse_loss / non_padded_tokens
 
+def compute_individual_logit_losses(merged_logits, 
+                                    topk_logits, 
+                                    topk_indices, 
+                                    attention_mask, 
+                                    non_padded_tokens, 
+                                    temperature, 
+                                    use_kl, 
+                                    use_mse, 
+                                    use_entropy, 
+                                    loss_logs, 
+                                    model_index=None):
+    masked_merged_logits = merged_logits * attention_mask.unsqueeze(-1)
+    masked_topk_target_logits = topk_logits * attention_mask.unsqueeze(-1)
+    gathered_masked_merged_logits = torch.gather(masked_merged_logits, dim=-1, index=topk_indices)
+
+    total_loss = 0.0
+
+    if use_kl:
+        kl_loss = kl_divergence_loss(gathered_masked_merged_logits, 
+                                     masked_topk_target_logits, 
+                                     non_padded_tokens, 
+                                     temperature=temperature)
+        loss_logs[f'kl_loss' + (f'_model_{model_index}' if model_index is not None else '')] = kl_loss
+        total_loss += kl_loss
+
+    if use_mse:
+        mse_loss_value = mse_loss(gathered_masked_merged_logits,
+                                  masked_topk_target_logits, 
+                                  non_padded_tokens)
+        loss_logs[f'mse_loss' + (f'_model_{model_index}' if model_index is not None else '')] = mse_loss_value
+        total_loss += mse_loss_value
+
+    if use_entropy:
+        e_loss = entropy_loss(masked_merged_logits, 
+                              attention_mask, 
+                              non_padded_tokens,
+                              temperature=temperature)
+        loss_logs[f'entropy_loss' + (f'_model_{model_index}' if model_index is not None else '')] = e_loss
+        total_loss += e_loss
+
+    return total_loss
+
 class DAMTrainer(Trainer):
     def __init__(self, model, lambda_coef=0.01, 
                  lambda_coef_l1=None,  # Added L1 regularization coefficient
@@ -57,6 +99,7 @@ class DAMTrainer(Trainer):
                  use_entropy=False,
                  base_model_path=None, 
                  use_wandb=False,
+                 generate_logits_on_fly=False,  # New parameter to control logits generation
                  **kwargs):
         super().__init__(model=model, **kwargs)
         self.lambda_coef = lambda_coef
@@ -70,8 +113,9 @@ class DAMTrainer(Trainer):
 
         self.base_model_path = base_model_path
         self.use_wandb = use_wandb
+        self.generate_logits_on_fly = generate_logits_on_fly  # Initialize the new parameter
 
-    def compute_loss(self, merged_model, inputs,return_outputs=False):
+    def compute_loss(self, merged_model, inputs, return_outputs=False):
         # Ensure the merged_model is on the correct device
         device = merged_model.device
         
@@ -97,46 +141,23 @@ class DAMTrainer(Trainer):
         
         total_loss = 0.0
         loss_logs = {}
+
         # Compute KL divergence loss between the merged model's logits and each corresponding top-K logits
         for i in range(1, num_inputs + 1):
             merged_logits = merged_logits_dict[f'merged_logits_{i}']
-            topk_logits = inputs[f'topk_logits_model_{i}'].to(device)
-            topk_indices = inputs[f'topk_indices_model_{i}'].to(device)
             attention_mask = attention_mask_dict[f'attention_mask_{i}']
-
-            # Calculate the number of non-padded tokens once
             non_padded_tokens = attention_mask.sum().item()
 
-            # Mask out the padding tokens in the logits
-            masked_merged_logits = merged_logits * attention_mask.unsqueeze(-1)
-            masked_topk_taget_logits = topk_logits * attention_mask.unsqueeze(-1)
-          
-            # Gather the logits corresponding to the top-K indices
-            gathered_masked_merged_logits = torch.gather(masked_merged_logits, dim=-1, index=topk_indices)
-
-            if self.use_kl:
-                # Calculate the KL divergence loss with normalization by the input length
-                kl_loss = kl_divergence_loss(gathered_masked_merged_logits, 
-                                            masked_topk_taget_logits, 
-                                            non_padded_tokens, 
-                                            temperature=self.temperature)
-                loss_logs[f'kl_loss'] = kl_loss
-                total_loss += kl_loss
-
-            if self.use_mse:
-                mse_loss_value = mse_loss(gathered_merged_logits,
-                                          masked_topk_taget_logits, 
-                                          non_padded_tokens
-                                          )
-                loss_logs[f'mse_loss'] = mse_loss_value
-                total_loss += mse_loss_value
-
-            if self.use_entropy:
-                e_loss = entropy_loss(masked_merged_logits, 
-                                      non_padded_tokens, 
-                                      temperature=self.temperature)
-                loss_logs[f'entropy_loss'] = e_loss
-                total_loss += e_loss
+            if self.generate_logits_on_fly:
+                for model_index in range(merged_model.num_models):
+                    model_logits = merged_model(input_ids=input_ids_dict[f'input_ids_{i}'], attention_mask=attention_mask_dict[f'attention_mask_{i}'], model_index=model_index).logits
+                    topk_logits = torch.topk(model_logits, k=model_logits.size(-1), dim=-1).values
+                    topk_indices = torch.topk(model_logits, k=model_logits.size(-1), dim=-1).indices
+                    total_loss += compute_individual_logit_losses(merged_logits, topk_logits, topk_indices, attention_mask, non_padded_tokens, self.temperature, self.use_kl, self.use_mse, self.use_entropy, loss_logs, model_index)
+            else:
+                topk_logits = inputs[f'topk_logits_model_{i}'].to(device)
+                topk_indices = inputs[f'topk_indices_model_{i}'].to(device)
+                total_loss += compute_individual_logit_losses(merged_logits, topk_logits, topk_indices, attention_mask, non_padded_tokens, self.temperature, self.use_kl, self.use_mse, self.use_entropy, loss_logs)
 
         # Compute similarity loss and L2 regularization for merging coefficients
         similarity_loss = torch.tensor(0.0, device=device)
