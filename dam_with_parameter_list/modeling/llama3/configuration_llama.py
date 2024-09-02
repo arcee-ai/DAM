@@ -154,6 +154,7 @@ class MergedLlamaConfig(PretrainedConfig):
         num_merged_models=3,
         init_merger_values=[],
         use_tanh=False,
+        model_index=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -187,6 +188,7 @@ class MergedLlamaConfig(PretrainedConfig):
         self.num_merged_models = num_merged_models
         self.init_merger_values = init_merger_values
         self.use_tanh = use_tanh
+        self.model_index = model_index
 
         super().__init__(
             pad_token_id=pad_token_id,
