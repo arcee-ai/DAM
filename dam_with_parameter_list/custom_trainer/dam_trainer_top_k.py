@@ -24,7 +24,7 @@ def kl_divergence_loss(logits, target_logits, non_padded_tokens, temperature=1.0
     
     return normalized_kl_div
 
-def entropy_loss(logits, attention_mask, non_padded_tokens temperature=1.0):
+def entropy_loss(logits, attention_mask, non_padded_tokens, temperature=1.0):
     # Apply softmax to the logits
     probabilities = F.softmax(logits / temperature, dim=-1)
     
