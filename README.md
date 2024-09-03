@@ -35,7 +35,7 @@ The `modeling` folder should be modified to include the DAM layers. To add your 
 Finally, you can run the training process with the `train_top_k.py` script using the following command:
 
 ```
-python train_top_k.py --config config.yaml
+python train_top_k.py
 ```
 
 ## Seamless Switch Between On-the-Fly and Pre-Computed Logits
