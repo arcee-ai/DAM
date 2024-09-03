@@ -19,31 +19,36 @@ os.environ['HF_HOME'] = '/home/ec2-user/.cache/huggingface'
 @click.option("--temperature", default=2.0)
 @click.option("--weight_decay", default=0.01)
 @click.option("--learning_rate", default=1e-2)
-@click.option("--lr_scheduler_type", default="cosine")
+@click.option("--lr_scheduler_type", default="linear")
 @click.option("--use_kl", default=True)
 @click.option("--use_mse", default=False)
 @click.option("--use_entropy", default=False)
 @click.option("--lambda_coef", default=0.01)
-@click.option("--lambda_coef_l1", default=None)
-@click.option("--lambda_coef_l2", default=0.0001)
+@click.option("--lambda_coef_l1", default=1e-6)
+@click.option("--lambda_coef_l2", default=1e-5)
+@click.option("--generate_logits_on_fly", default=True)
+@click.option("--use_all_logits", default=True)
 def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
          use_kl, use_mse, use_entropy,
-         lambda_coef, lambda_coef_l1, lambda_coef_l2):
+         lambda_coef, lambda_coef_l1, lambda_coef_l2,
+         generate_logits_on_fly, use_all_logits):
     # Model and dataset details
     base_model_name = "mistralai/Mistral-7B-v0.1" 
-    model_name = "/home/ec2-user/shamane/ZipLoRA/dam_with_parameter_list/merged_model"
+    model_name = "arcee-train/pplist-merged-untrained-with-base"#"/home/ec2-user/shamane/ZipLoRA/dam_with_parameter_list/merged_model"
     cache_dir = "/home/ec2-user/.cache/huggingface"
-    hf_disk_dataset_dir = "/home/ec2-user/shamane/ZipLoRA/dam_with_parameter_list/dataset_with_logits"
+    hf_disk_dataset_dir ="arcee-train/logits-dataset-full-set-top-50" # "/home/ec2-user/shamane/ZipLoRA/dam_with_parameter_list/dataset_with_logits"
 
     # Setup tokenizer
     tokenizer = AutoTokenizer.from_pretrained(base_model_name, use_fast=True, cache_dir=cache_dir)
 
     # Load the dataset from disk
-    dataset = load_from_disk(hf_disk_dataset_dir)
-    #dataset = load_dataset(hf_disk_dataset_dir, split="train")
+    # dataset = load_from_disk(hf_disk_dataset_dir)
+    dataset = load_dataset(hf_disk_dataset_dir, split="train")
 
     # Prepare the model
     model = prepare_model(model_name, cache_dir)
+
+    print(f"The number of merged models is: {model.num_merged_models}")
 
     # Training arguments
     training_args = TrainingArguments(
@@ -52,10 +57,10 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
         save_strategy="no",
         do_eval=False,
         learning_rate=learning_rate,
-        per_device_train_batch_size=4,
+        per_device_train_batch_size=2,
         per_device_eval_batch_size=1,
         num_train_epochs=3,
-        max_steps=10,
+        # max_steps=10,
         weight_decay=weight_decay,
         lr_scheduler_type=lr_scheduler_type,
         bf16=True,
@@ -66,7 +71,7 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
         logging_strategy="steps",
         report_to="wandb",
         gradient_accumulation_steps=4,
-        max_grad_norm=1.0
+        max_grad_norm=1.0,
     )
 
     
@@ -85,6 +90,8 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
         use_mse=use_mse,
         use_entropy=use_entropy,
         base_model_path=base_model_name,
+        generate_logits_on_fly=generate_logits_on_fly,
+        use_all_logits=use_all_logits,
     )
 
     wandb.init(entity = 'arcee-ai', project="Dynamic Adaptive Merging")

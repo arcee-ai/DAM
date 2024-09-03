@@ -1090,6 +1090,7 @@ class MergedLlamaForCausalLM(MergedLlamaPreTrainedModel):
         super().__init__(config)
         self.model = MergedLlamaModel(config)
         self.vocab_size = config.vocab_size
+        self.num_merged_models = config.num_merged_models
         self.lm_head = DAMLinearLayer(config.hidden_size, config.vocab_size, bias=False, num_models=config.num_merged_models)
 
         # Initialize weights and apply final processing

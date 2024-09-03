@@ -15,11 +15,13 @@ class DAMBaseLayer(nn.Module):
         init_merger_values=[],
         dtype=None,
         non_linearity: str = 'tanh',  # Option to apply non-linearity
+        model_index: Optional[int] = None,
     ):
         super().__init__()
 
         # Store the number of models being merged
         self.num_models = num_models
+        self.model_index = model_index
 
         # Store the non-linearity to be applied on the merging coefficients
         self.non_linearity = non_linearity
@@ -96,7 +98,8 @@ class DAMLinearLayer(DAMBaseLayer):
         bias: bool=False,
         init_merger_values=[],
         dtype=None,
-        non_linearity: str = 'tanh',  # Option to apply non-linearity
+        non_linearity: str = 'tanh',  # Option to apply non-linearity   
+        model_index: Optional[int] = None,
     ):
         super().__init__(
             in_features=in_features,
@@ -105,6 +108,7 @@ class DAMLinearLayer(DAMBaseLayer):
             init_merger_values=init_merger_values,
             dtype=dtype,
             non_linearity=non_linearity,
+            model_index=model_index,
         )
 
         # If no initial values are provided, set equal initial merger values for each model
@@ -144,11 +148,17 @@ class DAMLinearLayer(DAMBaseLayer):
         return None
 
     # Forward pass through the DAMLinearLayer
-    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        # Ensure the weights are on the same device as the input tensor
-        weight = self.get_dam_weight().to(hidden_states.device)
-        # Ensure the bias (if any) is on the same device as the input tensor
-        bias = self.get_dam_bias().to(hidden_states.device) if self.get_dam_bias() is not None else None
+    def forward(self, hidden_states: torch.Tensor) -> Union[torch.Tensor, list]:
+        if self.model_index is not None:
+            # Return the output from the specified model without merging
+            weight = self.weights[self.model_index].to(hidden_states.device)
+            bias = self.biases[self.model_index].to(hidden_states.device) if hasattr(self, 'biases') else None
+            return F.linear(hidden_states, weight=weight, bias=bias)
+        else:
+            # Ensure the weights are on the same device as the input tensor
+            weight = self.get_dam_weight().to(hidden_states.device)
+            # Ensure the bias (if any) is on the same device as the input tensor
+            bias = self.get_dam_bias().to(hidden_states.device) if self.get_dam_bias() is not None else None
 
-        # Perform the linear transformation using the merged weight and bias
-        return F.linear(hidden_states, weight=weight, bias=bias)
+            # Perform the linear transformation using the merged weight and bias
+            return F.linear(hidden_states, weight=weight, bias=bias)
