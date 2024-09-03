@@ -1,4 +1,4 @@
-# Dynamic Adaptive Merging (DAM)
+# Differentiable Adaptive Merging (DAM)
 
 <img src="figure/readme.webp" alt="Project Figure" width="600"/>
 
