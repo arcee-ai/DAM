@@ -1,6 +1,6 @@
 # DAM Implementation
 
-![Project Figure](figure/readme.webp)
+<img src="figure/readme.webp" alt="Project Figure" width="600"/>
 
 This repository contains two different implementations for running the merging coefficient tuning process:
 
