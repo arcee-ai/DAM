@@ -1,6 +1,10 @@
-# DAM Implementation
+# Dynamic Adaptive Merging (DAM)
 
 <img src="figure/readme.webp" alt="Project Figure" width="600"/>
+
+Differentiable Adaptive Merging (DAM) automates the integration of multiple LLMs with unique capabilities, optimizing the balance between models for improved data efficiency and reduced computational costs. DAM outperforms traditional and evolutionary methods, offering a scalable solution for versatile AI systems. Extensive experiments validate DAM's superiority across various model merging scenarios.
+
+## Steps to Run the Workflow
 
 This repository contains two different implementations for running the merging coefficient tuning process:
 
@@ -8,8 +12,6 @@ This repository contains two different implementations for running the merging c
 2. **dam_with_parameter_list**: This implementation utilizes a parameter list.
 
 You can choose either implementation based on your specific requirements.
-
-## Steps to Run the Workflow
 
 ### 1. Create the Merged Model
 First, create the merged model by running the `merge.py` script found in the respective folder (`dam_with_buffer` or `dam_with_parameter_list`). The resulting merged model will contain untrained coefficients.
