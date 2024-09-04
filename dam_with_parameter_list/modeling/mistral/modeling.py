@@ -27,7 +27,7 @@ from transformers.utils import (
     replace_return_docstrings,
 )
 from .config import MergedMistralConfig
-from ..dam import DAMLinearLayer
+from ..dam import DAMLinearLayer, DAMEmbeddingLayer
 
 if is_flash_attn_2_available():
     from transformers.modeling_flash_attention_utils import _flash_attention_forward
@@ -687,7 +687,7 @@ class MergedMistralModel(MergedMistralPreTrainedModel):
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
 
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+        self.embed_tokens = DAMEmbeddingLayer(config.vocab_size, config.hidden_size, self.padding_idx)
         self.layers = nn.ModuleList(
             [MergedMistralDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )

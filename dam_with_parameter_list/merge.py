@@ -2,7 +2,7 @@ import argparse
 import torch
 import os
 import json
-from modeling.dam import DAMLinearLayer
+from modeling.dam import DAMLinearLayer, DAMEmbeddingLayer
 from utils import find_linear_layers, find_embedding_layers
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from glom import glom, Assign
@@ -44,6 +44,27 @@ def merge_models(base_model_id, model_ids, output_path, device, use_base_model, 
 
     tokenizer = AutoTokenizer.from_pretrained(base_model_id, use_fast=True)
 
+
+    if use_embedding_layers:
+        embedding_modules = find_embedding_layers(merged_model)
+
+        for m in tqdm(embedding_modules, desc="Merging embedding layers"):
+            modules = [glom(model, m) for model in models]
+
+            dam_embedding_layer = DAMEmbeddingLayer(
+                num_embeddings=modules[0].num_embeddings,
+                embedding_dim=modules[0].embedding_dim,
+                num_models=len(models),
+                dtype=modules[0].weight.dtype,
+                non_linearity=non_linearity  # Set non_linearity based on user input
+            ).to(device)
+
+            for i, module in enumerate(modules):
+                dam_embedding_layer.embeddings[i].data = module.weight.data  # Corrected assignment
+
+            assign = Assign(m, dam_embedding_layer)
+            glom(merged_model, assign)   
+    exit()
     # Step 1: Identify all the linear layers in the merged model that need to be processed.
     linear_modules = find_linear_layers(merged_model)
 
@@ -86,6 +107,8 @@ def merge_models(base_model_id, model_ids, output_path, device, use_base_model, 
         # Apply the assignment to the merged model, effectively inserting the merged DAMLinearLayer in place of the original layer
         glom(merged_model, assign)
 
+  
+
     # Function to count the number of parameters
     def count_parameters(model):
         total_params = sum(p.numel() for p in model.parameters())
@@ -122,6 +145,7 @@ def main():
     parser.add_argument("model_ids", nargs='+', help="IDs of the models to merge (for linear layers)")
     parser.add_argument("--output_path", help="Path to save the merged model")
     parser.add_argument("--device", default="cpu", help="Device to use for computation (e.g., 'cpu', 'cuda')")
+    parser.add_argument("--use_embedding_layers", action='store_true', help="Include embedding layers in the merging process")
     parser.add_argument("--use_base_model", action='store_true', help="Include base model's linear layers in the merging process")
     parser.add_argument("--non_linearity", choices=['tanh', 'sigmoid', 'relu', None], default=None, help="Non-linearity to use in DAMLinearLayer")
 
@@ -139,4 +163,4 @@ if __name__ == "__main__":
     main()
 
 
-# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path /workspace/merged_model --use_base_model --non_linearity tanh
+# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path /workspace/merged_model --use_embedding_layers --use_base_model --non_linearity tanh
