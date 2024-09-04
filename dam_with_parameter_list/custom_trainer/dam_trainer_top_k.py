@@ -4,6 +4,7 @@ from transformers import Trainer, AutoModelForCausalLM
 from modeling.dam import DAMLinearLayer
 from safetensors.torch import save_file
 from tqdm import tqdm
+from glom import glom
 
 try:
     import wandb
@@ -216,9 +217,9 @@ class DAMTrainer(Trainer):
         tensors = {}
         
         # Iterate through all modules and update weights for DAMLinearLayers
-        for (name, module), (_, new_module) in tqdm(zip(self.model.named_modules(), new_model.named_modules()), 
-                                                    desc="Merging layers"):
-            if isinstance(module, DAMLinearLayer) and isinstance(new_module, torch.nn.Linear):
+        for name, module in tqdm(self.model.named_modules(), desc="Merging layers"):
+            if isinstance(module, DAMLinearLayer):
+                corresponding_module = glom(new_model, name)
                 # Get the merged weight and bias
                 merged_weight = module.get_dam_weight().to(new_module.weight.device)
                 
@@ -232,9 +233,9 @@ class DAMTrainer(Trainer):
                     merged_bias = merged_bias.to(new_module.bias.device)
 
                 # Update the weights and bias of the corresponding layer in the new model
-                new_module.weight.data = merged_weight
+                corresponding_module.weight.data = merged_weight
                 if merged_bias is not None:
-                    new_module.bias.data = merged_bias
+                    corresponding_module.bias.data = merged_bias
 
         # Save the new model
         save_file(tensors, os.path.join(output_dir, f"mergers.safetensors"))
