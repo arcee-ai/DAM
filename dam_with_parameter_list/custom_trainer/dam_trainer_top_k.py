@@ -2,8 +2,7 @@ import torch
 import torch.nn.functional as F
 from transformers import Trainer, AutoModelForCausalLM
 from modeling.dam import DAMLinearLayer
-
-
+from safetensors.torch import save_file
 from tqdm import tqdm
 
 try:
@@ -213,15 +212,23 @@ class DAMTrainer(Trainer):
 
         # Initialize a new model with the same architecture as the base model
         new_model = AutoModelForCausalLM.from_pretrained(self.base_model_path, torch_dtype=torch.bfloat16)
-
+        
+        tensors = {}
+        
         # Iterate through all modules and update weights for DAMLinearLayers
         for (name, module), (_, new_module) in tqdm(zip(self.model.named_modules(), new_model.named_modules()), 
                                                     desc="Merging layers"):
             if isinstance(module, DAMLinearLayer) and isinstance(new_module, torch.nn.Linear):
                 # Get the merged weight and bias
                 merged_weight = module.get_dam_weight().to(new_module.weight.device)
+                
+                for i, merger in enumerate(module.mergers):
+                    tensors[f"{name}.mergers.{i}"] = merger
+                
                 merged_bias = module.get_dam_bias()
                 if merged_bias is not None:
+                    for i, bias in enumerate(module.biases):
+                        tensors[f"{name}.biases.{i}"] = bias
                     merged_bias = merged_bias.to(new_module.bias.device)
 
                 # Update the weights and bias of the corresponding layer in the new model
@@ -230,6 +237,8 @@ class DAMTrainer(Trainer):
                     new_module.bias.data = merged_bias
 
         # Save the new model
+        save_file(tensors, os.path.join(output_dir, f"mergers.safetensors"))
+
         new_model.save_pretrained(output_dir)
         self.tokenizer.save_pretrained(output_dir)
         print(f"Merged model saved successfully at {output_dir}!")
