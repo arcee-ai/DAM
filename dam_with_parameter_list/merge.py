@@ -30,7 +30,7 @@ def fix_config(save_path, num_models, non_linearity):
 
     return config_path  # Return the updated config
 
-def merge_models(base_model_id, model_ids, output_path, device, use_base_model, non_linearity, use_embedding_layers, merge_layernorms):
+def merge_models(base_model_id, model_ids, output_path, device, use_base_model, non_linearity, use_embedding_layers, merge_layernorms, repo_id):
 
     print(f"Loading base model: {base_model_id}")
     merged_model = AutoModelForCausalLM.from_pretrained(base_model_id, torch_dtype=torch.bfloat16, device_map=device)
@@ -150,15 +150,15 @@ def merge_models(base_model_id, model_ids, output_path, device, use_base_model, 
     fixed_config_path = fix_config(output_path, num_models=len(models), non_linearity=non_linearity)
 
     # push to the hub
-    tokenizer.push_to_hub("arcee-train/pplist-merged-untrained-with-base")
-    merged_model.push_to_hub("arcee-train/pplist-merged-untrained-with-base")
+    tokenizer.push_to_hub(repo_id)
+    merged_model.push_to_hub(repo_id)
 
     # Upload the fixed config file to the hub
     api = HfApi()
     api.upload_file(
         path_or_fileobj=fixed_config_path,
         path_in_repo="config.json",
-        repo_id="arcee-train/pplist-merged-untrained-with-base-layernorm-embedding",
+        repo_id=repo_id,
         repo_type="model",
     )
 
@@ -174,10 +174,11 @@ def main():
     parser.add_argument("--use_base_model", action='store_true', help="Include base model's linear layers in the merging process")
     parser.add_argument("--non_linearity", choices=['tanh', 'sigmoid', 'relu', None], default=None, help="Non-linearity to use in DAMLinearLayer")
     parser.add_argument("--merge_layernorms", action='store_true', help="Include layer normalization layers in the merging process")
+    parser.add_argument("--repo_id", required=True, help="Repository ID to push the merged model to")
 
     args = parser.parse_args()
 
-    merge_models(args.base_model_id, args.model_ids, args.output_path, args.device, args.use_base_model, args.non_linearity, args.use_embedding_layers, args.merge_layernorms)
+    merge_models(args.base_model_id, args.model_ids, args.output_path, args.device, args.use_base_model, args.non_linearity, args.use_embedding_layers, args.merge_layernorms, args.repo_id)
 
 if __name__ == "__main__":
     # os.environ['HF_TOKEN'] = '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'
@@ -189,4 +190,4 @@ if __name__ == "__main__":
     main()
 
 
-# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path /workspace/merged_model --use_embedding_layers --use_base_model --non_linearity tanh --merge_layernorms
+# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path ./merged_model --use_embedding_layers --use_base_model --non_linearity tanh --merge_layernorms --repo_id arcee-train/pplist-merged-untrained-with-base-layernorm-embedding
