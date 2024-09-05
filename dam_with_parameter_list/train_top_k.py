@@ -8,11 +8,12 @@ from transformers import TrainingArguments, default_data_collator
 from modeling.dam import DAMBaseLayer
 import click
 import wandb
+from pathlib import Path
 
 # Environment variables
-# os.environ['HF_TOKEN'] = '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'
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
-os.environ['HF_HOME'] = '/home/ec2-user/.cache/huggingface'
+# Manual configurations
+use_wandb = True
 
 # Command line arguments allow for WandB Sweep
 @click.command()
@@ -70,7 +71,7 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
         logging_dir='./logs',
         logging_steps=1,
         logging_strategy="steps",
-        report_to="wandb",
+        report_to="wandb" if use_wandb else "tensorboard",
         gradient_accumulation_steps=4,
         max_grad_norm=1.0,
     )
@@ -93,15 +94,21 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
         base_model_path=base_model_name,  # Pass base model as an argument
         generate_logits_on_fly=generate_logits_on_fly,
         use_all_logits=use_all_logits,
+        use_wandb=use_wandb
     )
 
-    wandb.init(entity = 'arcee-ai', project="Dynamic Adaptive Merging")
+    if use_wandb:
+        wandb.init(entity = 'arcee-ai', project="Dynamic Adaptive Merging")
+        wandb.config.update(loss_fns)
 
     # Train the model
     trainer.train()
 
     # Save the trained model
-    trainer.save_model()
+    save_path = Path("saved_models") / wandb.run.name if use_wandb else Path("results") / "model"
+    save_path.mkdir(parents=True, exist_ok=True)
+
+    trainer.save_model(save_path)
 
     wandb.finish()
 
