@@ -212,7 +212,7 @@ class DAMEmbeddingLayer(DAMBaseLayer):
             return F.embedding(input_ids, embedding)
 
 # Specialized class for a layer normalization that uses the DAMBaseLayer
-class DAMLayerNorm(DAMBaseLayer):
+class DAMRMSNorm(DAMBaseLayer):
     def __init__(
         self,
         normalized_shape: int,

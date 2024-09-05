@@ -2,7 +2,7 @@ import argparse
 import torch
 import os
 import json
-from modeling.dam import DAMLinearLayer, DAMEmbeddingLayer, DAMLayerNorm
+from modeling.dam import DAMLinearLayer, DAMEmbeddingLayer, DAMRMSNorm
 from utils import find_linear_layers, find_embedding_layers, find_norm_layers
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from glom import glom, Assign
@@ -53,8 +53,8 @@ def merge_models(base_model_id, model_ids, output_path, device, use_base_model, 
             # Step 2: For the current layer, gather the corresponding norm layers from each model that is being merged.
             modules = [glom(model, m) for model in models]
 
-            # Step 3: Create a new DAMLayerNorm that will be used to combine the weights from the models.
-            dam_layernorm = DAMLayerNorm(
+            # Step 3: Create a new DAMRMSNorm that will be used to combine the weights from the models.
+            dam_layernorm = DAMRMSNorm(
                 normalized_shape=modules[0].weight.shape[0],
                 num_models=len(models),
                 eps=modules[0].variance_epsilon,

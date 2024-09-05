@@ -10,7 +10,7 @@ import click
 import wandb
 
 # Environment variables
-os.environ['HF_TOKEN'] = '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'
+# os.environ['HF_TOKEN'] = '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'
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 os.environ['HF_HOME'] = '/home/ec2-user/.cache/huggingface'
 
@@ -28,25 +28,27 @@ os.environ['HF_HOME'] = '/home/ec2-user/.cache/huggingface'
 @click.option("--lambda_coef_l2", default=1e-5)
 @click.option("--generate_logits_on_fly", default=True)
 @click.option("--use_all_logits", default=True)
+@click.option("--untrained_merged_model_name", default="arcee-train/pplist-merged-untrained-with-base-layernorm-embedding")
+@click.option("--hf_disk_dataset_dir", default="arcee-train/logits-dataset-full-set-top-50")
+@click.option("--cache_dir", default="/home/ec2-user/.cache/huggingface")
 def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
          use_kl, use_mse, use_entropy,
          lambda_coef, lambda_coef_l1, lambda_coef_l2,
-         generate_logits_on_fly, use_all_logits):
+         generate_logits_on_fly, use_all_logits,
+         untrained_merged_model_name, hf_disk_dataset_dir, cache_dir):
     # Model and dataset details
-    base_model_name = "mistralai/Mistral-7B-v0.1" 
-    model_name = "arcee-train/pplist-merged-untrained-with-base"#"/home/ec2-user/shamane/ZipLoRA/dam_with_parameter_list/merged_model"
-    cache_dir = "/home/ec2-user/.cache/huggingface"
-    hf_disk_dataset_dir ="arcee-train/logits-dataset-full-set-top-50" # "/home/ec2-user/shamane/ZipLoRA/dam_with_parameter_list/dataset_with_logits"
-
+    
     # Setup tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(base_model_name, use_fast=True, cache_dir=cache_dir)
+    tokenizer = AutoTokenizer.from_pretrained(untrained_merged_model_name, use_fast=True, cache_dir=cache_dir)
 
     # Load the dataset from disk
     # dataset = load_from_disk(hf_disk_dataset_dir)
     dataset = load_dataset(hf_disk_dataset_dir, split="train")
 
     # Prepare the model
-    model = prepare_model(model_name, cache_dir)
+    model = prepare_model(untrained_merged_model_name, cache_dir=cache_dir)
+
+    exit()
 
     print(f"The number of merged models is: {model.num_merged_models}")
 
