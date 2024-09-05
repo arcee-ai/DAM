@@ -27,7 +27,7 @@ from transformers.utils import (
     replace_return_docstrings,
 )
 from .config import MergedMistralConfig
-from ..dam import DAMLinearLayer, DAMEmbeddingLayer
+from ..dam import DAMLinearLayer, DAMEmbeddingLayer, DAMRMSNorm
 
 if is_flash_attn_2_available():
     from transformers.modeling_flash_attention_utils import _flash_attention_forward
@@ -489,8 +489,8 @@ class MergedMistralDecoderLayer(nn.Module):
         self.self_attn = MISTRAL_ATTENTION_CLASSES[config._attn_implementation](config=config, layer_idx=layer_idx)
 
         self.mlp = MergedMistralMLP(config)
-        self.input_layernorm = MergedMistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.post_attention_layernorm = MergedMistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.input_layernorm = DAMRMSNorm(config.hidden_size, eps=config.rms_norm_eps, num_models=config.num_merged_models)
+        self.post_attention_layernorm = DAMRMSNorm(config.hidden_size, eps=config.rms_norm_eps, num_models=config.num_merged_models)
 
     def forward(
         self,
@@ -686,13 +686,17 @@ class MergedMistralModel(MergedMistralPreTrainedModel):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
-
-        self.embed_tokens = DAMEmbeddingLayer(config.vocab_size, config.hidden_size, self.padding_idx)
+        self.embed_tokens = DAMEmbeddingLayer(
+            num_embeddings=config.vocab_size,
+            embedding_dim=config.hidden_size,
+            num_models=config.num_merged_models,
+            padding_idx=self.padding_idx,
+        )
         self.layers = nn.ModuleList(
             [MergedMistralDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
         self._attn_implementation = config._attn_implementation
-        self.norm = MergedMistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.norm = DAMRMSNorm(config.hidden_size, eps=config.rms_norm_eps, num_models=config.num_merged_models)
 
         self.gradient_checkpointing = False
         # Initialize weights and apply final processing

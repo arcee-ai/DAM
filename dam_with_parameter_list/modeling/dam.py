@@ -174,6 +174,7 @@ class DAMEmbeddingLayer(DAMBaseLayer):
         dtype=None,
         non_linearity: str = 'tanh',  # Option to apply non-linearity
         model_index: Optional[int] = None,
+        padding_idx: Optional[int] = None,
     ):
         super().__init__(
             in_features=embedding_dim,
@@ -209,3 +210,59 @@ class DAMEmbeddingLayer(DAMBaseLayer):
             embedding = self.get_dam_embedding().to(input_ids.device)
             # Perform the embedding lookup using the merged embedding
             return F.embedding(input_ids, embedding)
+
+# Specialized class for a layer normalization that uses the DAMBaseLayer
+class DAMLayerNorm(DAMBaseLayer):
+    def __init__(
+        self,
+        normalized_shape: int,
+        num_models=3,
+        eps: float = 1e-5,
+        init_merger_values=[],
+        dtype=None,
+        non_linearity: str = 'tanh',  # Option to apply non-linearity
+        model_index: Optional[int] = None,
+    ):
+        super().__init__(
+            in_features=normalized_shape,
+            out_features=normalized_shape,
+            num_models=num_models,
+            init_merger_values=init_merger_values,
+            dtype=dtype,
+            non_linearity=non_linearity,
+            model_index=model_index,
+            is_embedding=False,  # This is not an embedding layer
+        )
+
+        self.eps = eps
+
+        # Initialize the list of weights for each model's layer normalization
+        self.weights = nn.ParameterList([Parameter(
+            torch.ones(normalized_shape, dtype=dtype) * self.init_merger_values[i]
+        ) for i in range(num_models)])
+
+    # Method to compute the combined weight for the merged layer normalization
+    def get_dam_weight(self):
+        device = self.mergers[0].device
+        constrained_mergers = [self.apply_non_linearity(merger) for merger in self.mergers] if self.non_linearity else self.mergers
+        # Sum the weighted contributions of each model's weight using the (possibly constrained) merging coefficients
+        return sum(merger.to(device) * weight.to(device) for merger, weight in zip(constrained_mergers, self.weights))
+
+    # Forward pass through the DAMLayerNorm
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        if self.model_index is not None:
+            # Return the output from the specified model without merging
+            weight = self.weights[self.model_index].to(hidden_states.device)
+            input_dtype = hidden_states.dtype
+            hidden_states = hidden_states.to(torch.float32)
+            variance = hidden_states.pow(2).mean(-1, keepdim=True)
+            hidden_states = hidden_states * torch.rsqrt(variance + self.eps)
+            return weight * hidden_states.to(input_dtype)
+        else:
+            # Ensure the weights are on the same device as the input tensor
+            weight = self.get_dam_weight().to(hidden_states.device)
+            input_dtype = hidden_states.dtype
+            hidden_states = hidden_states.to(torch.float32)
+            variance = hidden_states.pow(2).mean(-1, keepdim=True)
+            hidden_states = hidden_states * torch.rsqrt(variance + self.eps)
+            return weight * hidden_states.to(input_dtype)
