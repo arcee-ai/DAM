@@ -27,7 +27,7 @@ from transformers.utils import (
     replace_return_docstrings,
 )
 from .config import MergedMistralConfig
-from ..dam import DAMLinearLayer
+from ..dam import DAMLinearLayer, DAMEmbeddingLayer, DAMRMSNorm
 
 if is_flash_attn_2_available():
     from transformers.modeling_flash_attention_utils import _flash_attention_forward
@@ -38,24 +38,24 @@ _CONFIG_FOR_DOC = "MergedMistralConfig"
 
 
 # Copied from transformers.models.llama.modeling_llama.LlamaRMSNorm with Llama->Mistral
-class MergedMistralRMSNorm(nn.Module):
-    def __init__(self, hidden_size, eps=1e-6):
-        """
-        MergedMistralRMSNorm is equivalent to T5LayerNorm
-        """
-        super().__init__()
-        self.weight = nn.Parameter(torch.ones(hidden_size))
-        self.variance_epsilon = eps
+# class MergedMistralRMSNorm(nn.Module):
+#     def __init__(self, hidden_size, eps=1e-6):
+#         """
+#         MergedMistralRMSNorm is equivalent to T5LayerNorm
+#         """
+#         super().__init__()
+#         self.weight = nn.Parameter(torch.ones(hidden_size))
+#         self.variance_epsilon = eps
 
-    def forward(self, hidden_states):
-        input_dtype = hidden_states.dtype
-        hidden_states = hidden_states.to(torch.float32)
-        variance = hidden_states.pow(2).mean(-1, keepdim=True)
-        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
-        return self.weight * hidden_states.to(input_dtype)
+#     def forward(self, hidden_states):
+#         input_dtype = hidden_states.dtype
+#         hidden_states = hidden_states.to(torch.float32)
+#         variance = hidden_states.pow(2).mean(-1, keepdim=True)
+#         hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+#         return self.weight * hidden_states.to(input_dtype)
 
-    def extra_repr(self):
-        return f"{tuple(self.weight.shape)}, eps={self.variance_epsilon}"
+#     def extra_repr(self):
+#         return f"{tuple(self.weight.shape)}, eps={self.variance_epsilon}"
 
 
 class MergedMistralRotaryEmbedding(nn.Module):
@@ -489,8 +489,8 @@ class MergedMistralDecoderLayer(nn.Module):
         self.self_attn = MISTRAL_ATTENTION_CLASSES[config._attn_implementation](config=config, layer_idx=layer_idx)
 
         self.mlp = MergedMistralMLP(config)
-        self.input_layernorm = MergedMistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.post_attention_layernorm = MergedMistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.input_layernorm = DAMRMSNorm(config.hidden_size, eps=config.rms_norm_eps, num_models=config.num_merged_models)
+        self.post_attention_layernorm = DAMRMSNorm(config.hidden_size, eps=config.rms_norm_eps, num_models=config.num_merged_models)
 
     def forward(
         self,
@@ -686,13 +686,17 @@ class MergedMistralModel(MergedMistralPreTrainedModel):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
-
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+        self.embed_tokens = DAMEmbeddingLayer(
+            num_embeddings=config.vocab_size,
+            embedding_dim=config.hidden_size,
+            num_models=config.num_merged_models,
+            padding_idx=self.padding_idx,
+        )
         self.layers = nn.ModuleList(
             [MergedMistralDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
         self._attn_implementation = config._attn_implementation
-        self.norm = MergedMistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.norm = DAMRMSNorm(config.hidden_size, eps=config.rms_norm_eps, num_models=config.num_merged_models)
 
         self.gradient_checkpointing = False
         # Initialize weights and apply final processing
