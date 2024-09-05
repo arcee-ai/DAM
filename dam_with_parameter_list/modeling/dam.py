@@ -39,6 +39,27 @@ class DAMBaseLayer(nn.Module):
             torch.ones(in_features, dtype=dtype) * init_merger_values[i]
         ) for i in range(num_models)])
 
+    def compute_mergers_overlap(self, lambda_coef_overlap=0.000001):
+        # Initialize similarity loss
+        overlap_loss = 0.0
+        
+        # Create all possible pairs of merging coefficients
+        combinations = list(itertools.combinations([p for p in self.mergers], 2))
+        num_combinations = len(combinations)
+    
+        if num_combinations > 0:
+            overlaps = []
+            for merger_a, merger_b in combinations:
+                overlap = torch.sum(torch.min(torch.abs(merger_a),torch.abs(merger_b)), dim=0)
+
+                overlaps.append(overlap)
+                
+            # Average the overlaps and multiply by the provided coefficient
+            overlap_loss = torch.mean(torch.stack(overlaps))
+            overlap_loss *= lambda_coef_overlap
+    
+        return overlap_loss
+
     # Method to compute the similarity between merging coefficients
     def compute_mergers_similarity(self, lambda_coef=None):
         if lambda_coef is None:

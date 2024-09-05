@@ -49,36 +49,37 @@ def entropy_loss(logits, attention_mask, non_padded_tokens, temperature=1.0):
     # Normalize by the number of non-padded tokens
     return total_entropy_loss / non_padded_tokens
 
-def mse_loss(logits, target_logits, non_padded_tokens):
+def mse_loss(logits, target_logits, non_padded_tokens, lambda_coef=0.001):
     # Compute the MSE loss
     mse_loss = F.mse_loss(logits, target_logits, reduction='sum')
     
     # Normalize by the number of non-padded tokens
-    return mse_loss / non_padded_tokens
+    return lambda_coef * mse_loss / non_padded_tokens
 
 class DAMTrainer(Trainer):
-    def __init__(self, model, lambda_coef=0.01, 
+    def __init__(self, model, 
+                 lambda_coef_similarity=0.01,  # Added similarity regularization coefficient
                  lambda_coef_l1=None,  # Added L1 regularization coefficient
                  lambda_coef_l2=0.01,  # Added L2 regularization coefficient
+                 lambda_coef_overlap=0.000001,  # Added overlap regularization coefficient
+                 lambda_coef_mse=0.001,  # Added MSE regularization coefficient
                  temperature=2.0, 
-                 use_kl=True, 
-                 use_mse=False, 
-                 use_entropy=False,
+                 loss_fns=None,
                  base_model_path=None, 
                  use_wandb=True,
                  generate_logits_on_fly=False,  # New parameter to control logits generation
                  use_all_logits=False,
                  **kwargs):
         super().__init__(model=model, **kwargs)
-        self.lambda_coef = lambda_coef
+        self.lambda_coef_similarity = lambda_coef_similarity
         self.lambda_coef_l1 = lambda_coef_l1  # Initialize L1 regularization coefficient
         self.lambda_coef_l2 = lambda_coef_l2  # Initialize L2 regularization coefficient
+        self.lambda_coef_overlap = lambda_coef_overlap
+        self.lambda_coef_mse = lambda_coef_mse
         self.temperature = temperature
         self.use_all_logits = use_all_logits
 
-        self.use_kl = use_kl
-        self.use_mse = use_mse
-        self.use_entropy = use_entropy
+        self.loss_fns = loss_fns
 
         self.base_model_path = base_model_path
         self.use_wandb = use_wandb
@@ -93,7 +94,7 @@ class DAMTrainer(Trainer):
         total_loss = 0.0
         loss_logs = {}
 
-        if self.use_kl:
+        if self.loss_fns['kl']:
             kl_loss = kl_divergence_loss(masked_merged_logits, 
                                          masked_individual_logits, 
                                          non_padded_tokens, 
@@ -101,14 +102,15 @@ class DAMTrainer(Trainer):
             loss_logs[f'kl_loss_{dataple_id}'] = kl_loss
             total_loss += kl_loss
 
-        if self.use_mse:
+        if self.loss_fns['mse']:
             mse_loss_value = mse_loss(masked_merged_logits,
                                       masked_individual_logits, 
-                                      non_padded_tokens)
+                                      non_padded_tokens,
+                                      lambda_coef=self.lambda_coef_mse)
             loss_logs[f'mse_loss_{dataple_id}'] = mse_loss_value
             total_loss += mse_loss_value
 
-        if self.use_entropy:
+        if self.loss_fns['entropy']:
             e_loss = entropy_loss(masked_merged_logits, 
                                   attention_mask, 
                                   non_padded_tokens,
@@ -186,19 +188,23 @@ class DAMTrainer(Trainer):
         # Compute similarity loss and L2 regularization for merging coefficients
         similarity_loss = torch.tensor(0.0, device=device)
         l1_l2_reg = torch.tensor(0.0, device=device)
+        overlap_loss = torch.tensor(0.0, device=device)
         for module in merged_model.modules():
-            if hasattr(module, 'compute_mergers_similarity'):
+            if hasattr(module, 'compute_mergers_similarity') and self.loss_fns['similarity']:
                 similarity_loss += module.compute_mergers_similarity(self.lambda_coef).to(similarity_loss.device)
-            if hasattr(module, 'compute_mergers_L1_L2_reg'):
+            if hasattr(module, 'compute_mergers_L1_L2_reg' ) and self.loss_fns['l1_l2_reg']:
                 l1_l2_reg += module.compute_mergers_L1_L2_reg(
                     lambda_coef_l1=self.lambda_coef_l1, 
                     lambda_coef_l2=self.lambda_coef_l2
                 ).to(l1_l2_reg.device)
+            if hasattr(module, 'compute_mergers_overlap') and self.loss_fns['overlap']:
+                overlap_loss += module.compute_mergers_overlap(lambda_coef_overlap=self.lambda_coef_overlap).to(similarity_loss.device)
 
+        total_loss += similarity_loss + l1_l2_reg + overlap_loss
         all_loss_logs['similarity_loss'] = similarity_loss
         all_loss_logs['l1_l2_reg'] = l1_l2_reg
-
-        total_loss += similarity_loss + l1_l2_reg
+        all_loss_logs['overlap_loss'] = overlap_loss
+        all_loss_logs['total_loss'] = total_loss
 
         if self.use_wandb:
             wandb.log(all_loss_logs)

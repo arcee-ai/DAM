@@ -14,6 +14,14 @@ from pathlib import Path
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 # Manual configurations
 use_wandb = True
+loss_fns = {
+    "similarity": True, # default is True
+    "l1_l2_reg": True, # default is True
+    "overlap": False,   # default is False - proposed alternative to similarity
+    "kl":True, # default is True
+    "mse":False, # default is False - proposed alternative to kl
+    "entropy":False # default is False - proposed alternative to kl
+    }
 
 # Command line arguments allow for WandB Sweep
 @click.command()
@@ -21,9 +29,6 @@ use_wandb = True
 @click.option("--weight_decay", default=0.01)
 @click.option("--learning_rate", default=1e-2)
 @click.option("--lr_scheduler_type", default="linear")
-@click.option("--use_kl", default=True)
-@click.option("--use_mse", default=False)
-@click.option("--use_entropy", default=False)
 @click.option("--lambda_coef", default=0.01)
 @click.option("--lambda_coef_l1", default=1e-6)
 @click.option("--lambda_coef_l2", default=1e-5)
@@ -34,7 +39,6 @@ use_wandb = True
 @click.option("--cache_dir", default="/home/ec2-user/.cache/huggingface")
 @click.option("--base_model_name", default="mistralai/Mistral-7B-v0.1")
 def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
-         use_kl, use_mse, use_entropy,
          lambda_coef, lambda_coef_l1, lambda_coef_l2,
          generate_logits_on_fly, use_all_logits,
          untrained_merged_model_name, hf_disk_dataset_dir, cache_dir, base_model_name):
@@ -76,7 +80,6 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
         max_grad_norm=1.0,
     )
 
-    
     # Initialize DAMTrainer
     trainer = DAMTrainer(
         model=model,  # Pass the main model here
@@ -88,9 +91,7 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
         lambda_coef_l1=lambda_coef_l1,  # L1 regularization coefficient set to None
         lambda_coef_l2=lambda_coef_l2,  # L2 regularization coefficient
         temperature=temperature,  # Example temperature for KL divergence
-        use_kl=use_kl,
-        use_mse=use_mse,
-        use_entropy=use_entropy,
+        loss_fns=loss_fns,
         base_model_path=base_model_name,  # Pass base model as an argument
         generate_logits_on_fly=generate_logits_on_fly,
         use_all_logits=use_all_logits,
