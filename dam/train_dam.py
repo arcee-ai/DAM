@@ -29,7 +29,7 @@ loss_fns = {
 @click.option("--weight_decay", default=0.01)
 @click.option("--learning_rate", default=1e-2)
 @click.option("--lr_scheduler_type", default="linear")
-@click.option("--lambda_coef", default=0.01)
+@click.option("--lambda_coef_similarity", default=0.01)
 @click.option("--lambda_coef_l1", default=1e-6)
 @click.option("--lambda_coef_l2", default=1e-5)
 @click.option("--generate_logits_on_fly", default=True)
@@ -38,8 +38,8 @@ loss_fns = {
 @click.option("--hf_disk_dataset_dir", default="arcee-train/logits-dataset-full-set-top-50")
 @click.option("--cache_dir", default="/home/ec2-user/.cache/huggingface")
 @click.option("--base_model_name", default="mistralai/Mistral-7B-v0.1")
-def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
-         lambda_coef, lambda_coef_l1, lambda_coef_l2,
+def main(temperature, weight_decay, learning_rate, 
+         lr_scheduler_type, lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2,
          generate_logits_on_fly, use_all_logits,
          untrained_merged_model_name, hf_disk_dataset_dir, cache_dir, base_model_name):
     # Model and dataset details
@@ -87,7 +87,7 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
         train_dataset=dataset,
         tokenizer=tokenizer,
         data_collator=default_data_collator,
-        lambda_coef=lambda_coef,  # Example lambda coefficient for regularization
+        lambda_coef_similarity=lambda_coef_similarity,  # Example lambda coefficient for regularization
         lambda_coef_l1=lambda_coef_l1,  # L1 regularization coefficient set to None
         lambda_coef_l2=lambda_coef_l2,  # L2 regularization coefficient
         temperature=temperature,  # Example temperature for KL divergence
