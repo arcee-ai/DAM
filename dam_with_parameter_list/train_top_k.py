@@ -113,5 +113,9 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
 
     wandb.finish()
 
+    torch.cuda.empty_cache()
+    torch.cuda.reset_max_memory_allocated()
+    torch.cuda.reset_max_memory_cached()
+
 if __name__ == "__main__":
     main()
