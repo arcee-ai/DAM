@@ -44,18 +44,12 @@ def freeze_except_mergers(model):
         if "mergers" in name or "bias_mergers" in name:
             param.requires_grad = True
     
-def prepare_model(MODEL_ID, apply_to_embeddings=False):
-    merged_model = MergedMistralForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16, device_map="auto")
-    # we can't do this auto when we are using deepspeed.
-    # merged_model = MergedMistralForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16)
-    #merged_model = MergedMistralForCausalLM.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16, device_map="auto")
-
+def prepare_model(model_name, cache_dir):
+    print(f"Loading model from {model_name} with cache dir {cache_dir}")
+    merged_model = MergedMistralForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, device_map="auto", cache_dir=cache_dir)
     print_trainable_parameters(merged_model)
-
     freeze_except_mergers(merged_model)
-
     print("####################################")
-
     print_trainable_parameters(merged_model)
     
     return merged_model

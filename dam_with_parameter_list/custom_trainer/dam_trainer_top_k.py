@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from transformers import Trainer, AutoModelForCausalLM
-from modeling.dam import DAMLinearLayer
+from modeling.dam import DAMLinearLayer, DAMEmbeddingLayer, DAMRMSNorm
 from safetensors.torch import save_file
 from tqdm import tqdm
 from glom import glom
@@ -13,7 +13,7 @@ except:
 
 def set_model_index(model, index):
     for module in model.modules():
-        if isinstance(module, (DAMLinearLayer, torch.nn.Linear)):
+        if isinstance(module, (DAMLinearLayer, DAMEmbeddingLayer, DAMRMSNorm, torch.nn.Linear)):
             module.model_index = index
 
 def kl_divergence_loss(logits, target_logits, non_padded_tokens, temperature=1.0):
@@ -218,7 +218,7 @@ class DAMTrainer(Trainer):
         
         # Iterate through all modules and update weights for DAMLinearLayers
         for name, module in tqdm(self.model.named_modules(), desc="Merging layers"):
-            if isinstance(module, DAMLinearLayer):
+            if isinstance(module, (DAMLinearLayer, DAMEmbeddingLayer, DAMRMSNorm)):
                 corresponding_module = glom(new_model, name)
                 # Get the merged weight and bias
                 merged_weight = module.get_dam_weight().to(new_module.weight.device)
