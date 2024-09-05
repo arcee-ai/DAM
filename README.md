@@ -9,63 +9,54 @@ Differentiable Adaptive Merging (DAM) automates the integration of multiple LLMs
 This repository contains the implementation for running the merging coefficient tuning process.
 
 ### 1. Create the Merged Model
-First, create the merged model by running the `merge.py` script found in the `src` folder. The resulting merged model will contain untrained coefficients.
+First, create the merged model by running the `merge.py` script found in the `dam` folder. The resulting merged model will contain untrained coefficients.
+
+In this step, we assign a trainable coefficient for each column of each model's layer norms, embedding layers, and linear layers as specified by the user. These coefficients will be optimized during the training process to achieve the best integration of the models.
 
 #### Command:
 
 
 ```bash
-python src/merge.py <base_model_id> <model_ids> --output_path <output_path> --device <device> --use_embedding_layers --use_base_model --non_linearity <non_linearity> --merge_layernorms --repo_id <repo_id>
+python dam/merge.py <base_model_id> <model_ids> --output_path <output_path> --device <device> --use_embedding_layers --use_base_model --non_linearity <non_linearity> --merge_layernorms --repo_id <repo_id>
 ```
 
 #### Arguments:
-- `base_model_id`: ID of the base model (every weight except linear layers will be sourced from this model).
-- `model_ids`: IDs of the models to merge (for linear layers).
-- `--output_path`: Path to save the merged model.
+- `base_model_id`: ID of the base model. All layers of this model will be replaced with DAM layers.
+- `model_ids`: IDs of the models to merge. The linear layers from these models will be used.
+- `--output_path`: Path where the merged model will be saved.
 - `--device`: Device to use for computation (e.g., 'cpu', 'cuda').
-- `--use_embedding_layers`: Include embedding layers in the merging process.
-- `--use_base_model`: Include base model's linear layers in the merging process.
-- `--non_linearity`: Non-linearity to use in DAMLinearLayer (`tanh`, `sigmoid`, `relu`, or `None`).
-- `--merge_layernorms`: Include layer normalization layers in the merging process.
-- `--repo_id`: Repository ID to push the merged model to.
+- `--use_embedding_layers`: If specified, embedding layers will be included in the merging process.
+- `--use_base_model`: If specified, trainable coefficients will also be added to the base model's linear layers. This is optional.
+- `--non_linearity`: Specifies the non-linearity to use in the DAMLinearLayer. Options are `tanh`, `sigmoid`, `relu`, or `None`.
+- `--merge_layernorms`: If specified, layer normalization layers will be included in the merging process.
+- `--repo_id`: Repository ID where the merged model will be pushed.shed.
 
-### 2. Prepare the Dataset (Optional)
-This step is optional and depends on your chosen logits computation method:
+### 2. Prepare the Dataset
 
-- If you choose to compute logits on-the-fly, you can skip this step.
-- If you prefer to use pre-computed logits, navigate to the `src/data` folder and run `create_dataset_topk_logits.py`. This script will:
-  - Collect different datasets.
-  - Apply their templates.
-  - Tokenize the data.
-  - Optionally compute and save the top-K logits for other models, which will be used later during training.
+To prepare the dataset, navigate to the `dam/data` folder and run `create_merge_dataset.py`. This script will create a composite dataset with examples from the data used to train the models we are going to merge, apply their templates, and tokenize the data. Optionally, it can compute and save the top-K logits for other models, which will be used later during training. Additionally, it is optional to compute the logits beforehand; we can also compute them on-the-fly during training.
 
 #### Command:
-
-
-#### Command:
-
 
 ```bash
-python src/data/create_dataset_topk_logits.py --k 50 --dataset_names p1atdev/ichikara-instruction:20231115-1 microsoft/orca-math-word-problems-200k meta-math/MetaMathQA --model_ids augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --base_model_name mistralai/Mistral-7B-v0.1 --cache_dir /workspace/hf-cache --compute_logits True
+python dam/data/create_merge_dataset.py --k 50 --dataset_names p1atdev/ichikara-instruction:20231115-1 microsoft/orca-math-word-problems-200k meta-math/MetaMathQA --model_ids augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --base_model_name mistralai/Mistral-7B-v0.1 --cache_dir /workspace/hf-cache --compute_logits True
 ```
 
 #### Arguments:
-- `model_ids`: List of model IDs to load.
-- `cache_dir`: The directory to cache the models.
+- `--k`: The number of top logits to compute and save. This is optional.
+- `--dataset_names`: List of dataset names corresponding to the datasets used to tune each model. Samples will be picked from each dataset.
+- `--model_ids`: List of model IDs to load.
+- `--base_model_name`: Name of the base model.
+- `--cache_dir`: Directory to cache the models.
+- `--compute_logits`: If set to `True`, the top-K logits will be computed and saved. This is optional.
 
-### 3. Modeling
-The `modeling` folder should be modified to include the DAM layers. To add your models:
-- Place your models within the `src` folder.
-- Ensure that the DAM layers are correctly integrated within these models before proceeding to training.
-
-### 4. Run the Training
-Finally, you can run the training process with the `train_top_k.py` script using the following command:
+### 3. Run the Training
+In this step, navigate to the `dam/train_dam.py` script. The purpose of this step is to train the coefficients. At the end of the training process, the model is merged into the base model architecture with the optimized coefficients. Additionally, this code has the capability to work with multiple GPUs.
 
 #### Command:
 
 
 ```bash
-python src/train_top_k.py --temperature <temperature> --weight_decay <weight_decay> --learning_rate <learning_rate> --lr_scheduler_type <lr_scheduler_type> --use_kl <use_kl> --use_mse <use_mse> --use_entropy <use_entropy> --lambda_coef <lambda_coef> --lambda_coef_l1 <lambda_coef_l1> --lambda_coef_l2 <lambda_coef_l2> --generate_logits_on_fly <generate_logits_on_fly> --use_all_logits <use_all_logits> --untrained_merged_model_name <untrained_merged_model_name> --hf_disk_dataset_dir <hf_disk_dataset_dir> --cache_dir <cache_dir> --base_model_name <base_model_name>
+python dam/train_dam.py --temperature <temperature> --weight_decay <weight_decay> --learning_rate <learning_rate> --lr_scheduler_type <lr_scheduler_type> --use_kl <use_kl> --use_mse <use_mse> --use_entropy <use_entropy> --lambda_coef <lambda_coef> --lambda_coef_l1 <lambda_coef_l1> --lambda_coef_l2 <lambda_coef_l2> --generate_logits_on_fly <generate_logits_on_fly> --use_all_logits <use_all_logits> --untrained_merged_model_name <untrained_merged_model_name> --hf_disk_dataset_dir <hf_disk_dataset_dir> --cache_dir <cache_dir> --base_model_name <base_model_name>
 ```
 
 #### Arguments:

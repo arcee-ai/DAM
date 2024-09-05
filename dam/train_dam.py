@@ -3,7 +3,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from datasets import load_from_disk, load_dataset
 from model_preparation import prepare_model
-from custom_trainer.dam_trainer_top_k import DAMTrainer  # Custom DAMTrainer
+from custom_trainer.dam_trainer import DAMTrainer  # Custom DAMTrainer
 from transformers import TrainingArguments, default_data_collator
 from modeling.dam import DAMBaseLayer
 import click
