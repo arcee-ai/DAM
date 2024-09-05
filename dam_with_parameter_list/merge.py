@@ -86,7 +86,7 @@ def merge_models(base_model_id, model_ids, output_path, device, use_base_model, 
             non_linearity=non_linearity  # Set non_linearity based on user input
         ).to(device)
 
-        for i, module in enumerate(modules):
+        for i, module in enumerate(tqdm(modules, desc="Merging embedding layers")):
             dam_embedding_layer.embeddings[i].data = module.weight.data  # Corrected assignment
 
         assign = Assign(embedding_module[0], dam_embedding_layer)
