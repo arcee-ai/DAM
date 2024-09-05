@@ -12,8 +12,8 @@ from pathlib import Path
 
 # Environment variables
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
+
 # Manual configurations
-use_wandb = True
 loss_fns = {
     "similarity": True, # default is True
     "l1_l2_reg": True, # default is True
@@ -32,6 +32,7 @@ loss_fns = {
 @click.option("--lambda_coef_similarity", default=0.01)
 @click.option("--lambda_coef_l1", default=1e-6)
 @click.option("--lambda_coef_l2", default=1e-5)
+@click.option("--use_wandb", default=True)
 @click.option("--generate_logits_on_fly", default=True)
 @click.option("--use_all_logits", default=True)
 @click.option("--untrained_merged_model_name", default="arcee-train/pplist-merged-untrained-with-base-layernorm-embedding")
@@ -40,7 +41,7 @@ loss_fns = {
 @click.option("--base_model_name", default="mistralai/Mistral-7B-v0.1")
 def main(temperature, weight_decay, learning_rate, 
          lr_scheduler_type, lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2,
-         generate_logits_on_fly, use_all_logits,
+         use_wandb, generate_logits_on_fly, use_all_logits,
          untrained_merged_model_name, hf_disk_dataset_dir, cache_dir, base_model_name):
     # Model and dataset details
     

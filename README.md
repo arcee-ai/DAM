@@ -53,11 +53,14 @@ python dam/data/create_merge_dataset.py --k 50 --dataset_names p1atdev/ichikara-
 ### 3. Run the Training
 In this step, navigate to the `dam/train_dam.py` script. The purpose of this step is to train the coefficients. At the end of the training process, the model is merged into the base model architecture with the optimized coefficients. Additionally, this code has the capability to work with multiple GPUs.
 
+Manual configurations are available at the top of the train_dam.py script. 
+- Individual components of the loss function can be toggled by setting their associated value to True/False in the loss_fns dictionary 
+
 #### Command:
 
 
 ```bash
-python dam/train_dam.py --temperature <temperature> --weight_decay <weight_decay> --learning_rate <learning_rate> --lr_scheduler_type <lr_scheduler_type> --use_kl <use_kl> --use_mse <use_mse> --use_entropy <use_entropy> --lambda_coef <lambda_coef> --lambda_coef_l1 <lambda_coef_l1> --lambda_coef_l2 <lambda_coef_l2> --generate_logits_on_fly <generate_logits_on_fly> --use_all_logits <use_all_logits> --untrained_merged_model_name <untrained_merged_model_name> --hf_disk_dataset_dir <hf_disk_dataset_dir> --cache_dir <cache_dir> --base_model_name <base_model_name>
+python dam/train_dam.py --temperature <temperature> --weight_decay <weight_decay> --learning_rate <learning_rate> --lr_scheduler_type <lr_scheduler_type> --lambda_coef_similarity <lambda_coef_similarity> --lambda_coef_l1 <lambda_coef_l1> --lambda_coef_l2 <lambda_coef_l2> --generate_logits_on_fly <generate_logits_on_fly> --use_all_logits <use_all_logits> --untrained_merged_model_name <untrained_merged_model_name> --hf_disk_dataset_dir <hf_disk_dataset_dir> --cache_dir <cache_dir> --base_model_name <base_model_name>
 ```
 
 #### Arguments:
@@ -71,6 +74,7 @@ python dam/train_dam.py --temperature <temperature> --weight_decay <weight_decay
 - `--lambda_coef`: Lambda coefficient for regularization.
 - `--lambda_coef_l1`: L1 regularization coefficient.
 - `--lambda_coef_l2`: L2 regularization coefficient.
+- `--use_wandb`: Upload training logs to Weights and Biases
 - `--generate_logits_on_fly`: Generate logits on-the-fly during training.
 - `--use_all_logits`: Use all logits during training.
 - `--untrained_merged_model_name`: Name of the untrained merged model.
