@@ -31,11 +31,12 @@ os.environ['HF_HOME'] = '/home/ec2-user/.cache/huggingface'
 @click.option("--untrained_merged_model_name", default="arcee-train/pplist-merged-untrained-with-base-layernorm-embedding")
 @click.option("--hf_disk_dataset_dir", default="arcee-train/logits-dataset-full-set-top-50")
 @click.option("--cache_dir", default="/home/ec2-user/.cache/huggingface")
+@click.option("--base_model_name", default="mistralai/Mistral-7B-v0.1")
 def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
          use_kl, use_mse, use_entropy,
          lambda_coef, lambda_coef_l1, lambda_coef_l2,
          generate_logits_on_fly, use_all_logits,
-         untrained_merged_model_name, hf_disk_dataset_dir, cache_dir):
+         untrained_merged_model_name, hf_disk_dataset_dir, cache_dir, base_model_name):
     # Model and dataset details
     
     # Setup tokenizer
@@ -47,8 +48,6 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
 
     # Prepare the model
     model = prepare_model(untrained_merged_model_name, cache_dir=cache_dir)
-
-    exit()
 
     print(f"The number of merged models is: {model.num_merged_models}")
 
@@ -91,7 +90,7 @@ def main(temperature, weight_decay, learning_rate, lr_scheduler_type,
         use_kl=use_kl,
         use_mse=use_mse,
         use_entropy=use_entropy,
-        base_model_path=base_model_name,
+        base_model_path=base_model_name,  # Pass base model as an argument
         generate_logits_on_fly=generate_logits_on_fly,
         use_all_logits=use_all_logits,
     )
