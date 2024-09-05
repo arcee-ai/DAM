@@ -1,0 +1,9 @@
+glom
+transformers
+datasets
+bitsandbytes
+accelerate
+peft
+hf_transfer
+matplotlib
+flash-attn --no-build-isolation

@@ -1,6 +1,6 @@
 # Differentiable Adaptive Merging (DAM)
 
-<img src="figure/readme.webp" alt="Project Figure" width="600"/>
+<img src="figures/readme.webp" alt="Project Figure" width="600"/>
 
 Differentiable Adaptive Merging (DAM) automates the merging of multiple LLMs with unique capabilities, optimizing the balance between models for improved data efficiency and reduced computational costs. DAM outperforms traditional and evolutionary methods, offering a scalable solution for versatile AI systems. Extensive experiments validate DAM's superiority across various model merging scenarios.
 
@@ -38,7 +38,7 @@ To prepare the dataset, navigate to the `dam/data` folder and run `create_merge_
 #### Command:
 
 ```bash
-python dam/data/create_merge_dataset.py --k 50 --dataset_names p1atdev/ichikara-instruction:20231115-1 microsoft/orca-math-word-problems-200k meta-math/MetaMathQA --model_ids augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --base_model_name mistralai/Mistral-7B-v0.1 --cache_dir /workspace/hf-cache --compute_logits True
+python dam/data/create_merge_dataset.py --k 50 --dataset_names p1atdev/ichikara-instruction:20231115-1 microsoft/orca-math-word-problems-200k meta-math/MetaMathQA --model_ids augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --base_model_name mistralai/Mistral-7B-v0.1 --cache_dir /workspace/hf-cache --compute_logits True --dataset_id arcee-train/my-combined-dataset
 ```
 
 #### Arguments:
@@ -48,6 +48,7 @@ python dam/data/create_merge_dataset.py --k 50 --dataset_names p1atdev/ichikara-
 - `--base_model_name`: Name of the base model.
 - `--cache_dir`: Directory to cache the models.
 - `--compute_logits`: If set to `True`, the top-K logits will be computed and saved. This is optional.
+- `--dataset_id`: ID of the dataset to push to Hugging Face Hub.
 
 ### 3. Run the Training
 In this step, navigate to the `dam/train_dam.py` script. The purpose of this step is to train the coefficients. At the end of the training process, the model is merged into the base model architecture with the optimized coefficients. Additionally, this code has the capability to work with multiple GPUs.

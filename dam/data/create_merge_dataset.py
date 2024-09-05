@@ -1,12 +1,13 @@
 import os
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
-from datasets import Dataset
+from datasets import Dataset, load_from_disk
 from data_setup import setup_datasets_and_templates  # Assuming this function is in data_setup.py
 from data_preprocessing import preprocess_data  # Assuming this function is in data_preprocessing.py
 
 from torch.utils.data import DataLoader
 from transformers import default_data_collator
+from pathlib import Path
 import click
 from tqdm import tqdm
 
@@ -90,7 +91,8 @@ def compute_and_save_topk_logits(models_dict, tokenized_dataset, device, batch_s
 @click.option("--base_model_name", type=str, default="mistralai/Mistral-7B-v0.1", help="Base model name.")
 @click.option("--cache_dir", type=str, default="/workspace/hf-cache", help="Cache directory.")
 @click.option("--compute_logits", type=bool, default=True, help="Whether to compute logits or just keep input_ids.")
-def main(k, dataset_names, model_ids, base_model_name, cache_dir, compute_logits):
+@click.option("--dataset_id", type=str, default="arcee-train/my-combined-dataset", help="Dataset ID to push to Hugging Face Hub.")
+def main(k, dataset_names, model_ids, base_model_name, cache_dir, compute_logits, dataset_id):
     # Environment variables
     
     # Setup tokenizer and datasets
@@ -112,7 +114,25 @@ def main(k, dataset_names, model_ids, base_model_name, cache_dir, compute_logits
     print(combined_dataset_with_top_k_logits)
 
     # Save the dataset with logits to disk
-    combined_dataset_with_top_k_logits.save_to_disk(f"./DAM_logits_k_{k}")
+    dataset_path = f"./DAM_logits_k_{k}"
+    combined_dataset_with_top_k_logits.save_to_disk(dataset_path)
+
+    # Push the dataset to Hugging Face Hub
+    dataset_path = Path(dataset_path)
+
+    if not dataset_path.exists():
+        raise FileNotFoundError(f"Dataset not found at {dataset_path}")
+
+    try:
+        # Load the dataset from the saved directory
+        dataset = load_from_disk(dataset_path)
+    except Exception as e:
+        raise Exception(f"Error loading dataset from {dataset_path}: {e}")
+
+    # Push the dataset to Hugging Face Hub
+    dataset.push_to_hub(dataset_id)
+
+    print("Dataset successfully uploaded to Hugging Face!")
 
 if __name__ == "__main__":
     main()
