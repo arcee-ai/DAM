@@ -49,12 +49,12 @@ def entropy_loss(logits, attention_mask, non_padded_tokens, temperature=1.0):
     # Normalize by the number of non-padded tokens
     return total_entropy_loss / non_padded_tokens
 
-def mse_loss(logits, target_logits, non_padded_tokens, lambda_coef=0.001):
+def mse_loss(logits, target_logits, non_padded_tokens, lambda_coef_mse=0.001):
     # Compute the MSE loss
     mse_loss = F.mse_loss(logits, target_logits, reduction='sum')
     
     # Normalize by the number of non-padded tokens
-    return lambda_coef * mse_loss / non_padded_tokens
+    return lambda_coef_mse * mse_loss / non_padded_tokens
 
 class DAMTrainer(Trainer):
     def __init__(self, model, 
@@ -106,7 +106,7 @@ class DAMTrainer(Trainer):
             mse_loss_value = mse_loss(masked_merged_logits,
                                       masked_individual_logits, 
                                       non_padded_tokens,
-                                      lambda_coef=self.lambda_coef_mse)
+                                      lambda_coef_mse=self.lambda_coef_mse)
             loss_logs[f'mse_loss_{dataple_id}'] = mse_loss_value
             total_loss += mse_loss_value
 
@@ -191,7 +191,7 @@ class DAMTrainer(Trainer):
         overlap_loss = torch.tensor(0.0, device=device)
         for module in merged_model.modules():
             if hasattr(module, 'compute_mergers_similarity') and self.loss_fns['similarity']:
-                similarity_loss += module.compute_mergers_similarity(self.lambda_coef).to(similarity_loss.device)
+                similarity_loss += module.compute_mergers_similarity(self.lambda_coef_similarity).to(similarity_loss.device)
             if hasattr(module, 'compute_mergers_L1_L2_reg' ) and self.loss_fns['l1_l2_reg']:
                 l1_l2_reg += module.compute_mergers_L1_L2_reg(
                     lambda_coef_l1=self.lambda_coef_l1, 
