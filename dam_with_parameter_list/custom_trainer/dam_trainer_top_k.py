@@ -218,20 +218,30 @@ class DAMTrainer(Trainer):
         tensors = {}
         
         # Iterate through all modules and update weights for DAMLinearLayers
-        for name, module in tqdm(self.model.named_modules(), desc="Merging layers"):
+        for name, module in tqdm(self.model.named_modules(), desc="Merging layers", total=len(list(self.model.named_modules()))):
             if isinstance(module, (DAMLinearLayer, DAMEmbeddingLayer, DAMRMSNorm)):
                 corresponding_module = glom(new_model, name)
                 # Get the merged weight and bias
-                merged_weight = module.get_dam_weight().to(new_module.weight.device)
                 
+                if isinstance(module, DAMLinearLayer):
+                    merged_weight = module.get_dam_weight().to(corresponding_module.weight.device)
+                if isinstance(module, DAMEmbeddingLayer):
+                    merged_weight = module.get_dam_embedding().to(corresponding_module.weight.device)
+                if isinstance(module, DAMRMSNorm):
+                    merged_weight = module.get_dam_weight().to(corresponding_module.weight.device)
+                    
                 for i, merger in enumerate(module.mergers):
                     tensors[f"{name}.mergers.{i}"] = merger
+
+
+                merged_bias = None
                 
-                merged_bias = module.get_dam_bias()
-                if merged_bias is not None:
-                    for i, bias in enumerate(module.biases):
-                        tensors[f"{name}.biases.{i}"] = bias
-                    merged_bias = merged_bias.to(new_module.bias.device)
+                if hasattr(module, 'get_dam_bias'):
+                    merged_bias = module.get_dam_bias()
+                    if merged_bias is not None:
+                        for i, bias in enumerate(module.biases):
+                            tensors[f"{name}.biases.{i}"] = bias
+                        merged_bias = merged_bias.to(corresponding_module.bias.device)
 
                 # Update the weights and bias of the corresponding layer in the new model
                 corresponding_module.weight.data = merged_weight
