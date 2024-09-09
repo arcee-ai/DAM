@@ -149,7 +149,7 @@ class DAMTrainer(Trainer):
         if self.generate_logits_on_fly:
             individual_logits_dict = {}
             # we do not compute logits for the base model
-            for model_index in range(merged_model.num_merged_models - 1):
+            for model_index in range(num_datasets):
                 # set the model index for the merged model to get correct logits from individual models.
                 set_model_index(merged_model, index=model_index)
                 input_ids = input_ids_dict[f'input_ids_{model_index + 1}']
