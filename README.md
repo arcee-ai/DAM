@@ -52,7 +52,7 @@ python dam/data/create_merge_dataset.py --k 50 --dataset_names "p1atdev/ichikara
 - `--dataset_id`: ID of the dataset to push to Hugging Face Hub.
 - `--example_count`: Number of examples to select from each dataset.
 - `--max_length`: Maximum length of the tokenized examples.
-- `add_top_k_logits`: Add top-K logits to the combined dataset. Default is False.
+- `--add_top_k_logits`: Add top-K logits to the combined dataset. The default is False.
 
 
 ### 3. Run the Training
