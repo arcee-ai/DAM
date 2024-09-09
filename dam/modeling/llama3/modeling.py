@@ -30,7 +30,7 @@ from  transformers.utils import (
     replace_return_docstrings,
 )
 from .configuration_llama import MergedLlamaConfig
-from ..dam import DAMLinearLayer
+from ..dam import DAMLinearLayer, DAMRMSNorm, DAMEmbeddingLayer
 
 logger = logging.get_logger(__name__)
 
@@ -90,7 +90,7 @@ def _prepare_4d_causal_attention_mask_with_cache_position(
     return causal_mask
 
 
-class MergedLlamaRMSNorm(nn.Module):
+class LlamaRMSNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-6):
         """
         LlamaRMSNorm is equivalent to T5LayerNorm
@@ -110,7 +110,7 @@ class MergedLlamaRMSNorm(nn.Module):
         return f"{tuple(self.weight.shape)}, eps={self.variance_epsilon}"
 
 
-ALL_LAYERNORM_LAYERS.append(MergedLlamaRMSNorm)
+ALL_LAYERNORM_LAYERS.append(LlamaRMSNorm)
 
 
 class MergedLlamaRotaryEmbedding(nn.Module):
@@ -664,8 +664,8 @@ class MergedLlamaDecoderLayer(nn.Module):
         self.self_attn = LLAMA_ATTENTION_CLASSES[config._attn_implementation](config=config, layer_idx=layer_idx)
 
         self.mlp = MergedLlamaMLP(config)
-        self.input_layernorm = MergedLlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.post_attention_layernorm = MergedLlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.input_layernorm = DAMRMSNorm(config.hidden_size, eps=config.rms_norm_eps, num_models=config.num_merged_models) if config.dam_layernorms else LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.post_attention_layernorm = DAMRMSNorm(config.hidden_size, eps=config.rms_norm_eps, num_models=config.num_merged_models) if config.dam_layernorms else LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
     def forward(
         self,
@@ -872,11 +872,16 @@ class MergedLlamaModel(MergedLlamaPreTrainedModel):
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
 
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+        self.embed_tokens = DAMEmbeddingLayer(
+            num_embeddings=config.vocab_size,
+            embedding_dim=config.hidden_size,
+            num_models=config.num_merged_models,
+            padding_idx=self.padding_idx,
+        ) if config.dam_embedding_layer else nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
         self.layers = nn.ModuleList(
             [MergedLlamaDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
-        self.norm = MergedLlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.norm = DAMRMSNorm(config.hidden_size, eps=config.rms_norm_eps, num_models=config.num_merged_models) if config.dam_layernorms else LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = MergedLlamaRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
 

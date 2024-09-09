@@ -1,6 +1,6 @@
 from datasets import load_dataset
 
-def setup_datasets_and_templates(tokenizer, dataset_names, example_count=None):
+def setup_datasets_and_templates(tokenizer, dataset_names, example_count=None, seed=None):
     """
     Setup datasets and apply templates dynamically based on provided dataset names and column structures.
 
@@ -62,6 +62,9 @@ def setup_datasets_and_templates(tokenizer, dataset_names, example_count=None):
         # Select examples if example_count is provided
         if example_count:
             dataset = select_examples(dataset, example_count)
+        
+        if seed is not None:
+            dataset.shuffle(seed=seed)
 
         # Determine the input and output columns
         input_column, output_column = determine_columns(dataset)

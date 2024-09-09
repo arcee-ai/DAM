@@ -89,7 +89,8 @@ def compute_and_save_topk_logits(models_dict, tokenized_dataset, device, batch_s
 @click.option("--example_count", type=int, default=1729, help="Number of examples to select from each dataset.")
 @click.option("--max_length", type=int, default=2048, help="Controls the length of the tokenized examples that will be used to train.")
 @click.option("--add_top_k_logits", type=bool, default=False, help="Whether to add top-K logits to the combined dataset.")
-def main(k, dataset_names, model_ids, base_model_name, cache_dir, compute_logits, dataset_id, base_model_dataset_name, example_count, max_length, add_top_k_logits):
+@click.option("--seed", type=int, default=None, help="Seed used to shuffle the datasets")
+def main(k, dataset_names, model_ids, base_model_name, cache_dir, compute_logits, dataset_id, base_model_dataset_name, example_count, max_length, add_top_k_logits, seed):
     # Environment variables
     
     # Setup tokenizer and datasets
@@ -100,7 +101,7 @@ def main(k, dataset_names, model_ids, base_model_name, cache_dir, compute_logits
     model_ids = model_ids.split(',')
     
     # Load and template the datasets
-    templated_datasets = setup_datasets_and_templates(tokenizer, dataset_names, example_count=example_count)
+    templated_datasets = setup_datasets_and_templates(tokenizer, dataset_names, example_count=example_count, seed=seed)
 
     # Data preprocessing
     combined_dataset, tokenizer = preprocess_data(templated_datasets=templated_datasets, 
