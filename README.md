@@ -38,17 +38,22 @@ To prepare the dataset, navigate to the `dam/data` folder and run `create_merge_
 #### Command:
 
 ```bash
-python dam/data/create_merge_dataset.py --k 50 --dataset_names p1atdev/ichikara-instruction:20231115-1 microsoft/orca-math-word-problems-200k meta-math/MetaMathQA --model_ids augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --base_model_name mistralai/Mistral-7B-v0.1 --cache_dir /workspace/hf-cache --compute_logits True --dataset_id arcee-train/my-combined-dataset
+python dam/data/create_merge_dataset.py --k 50 --dataset_names "p1atdev/ichikara-instruction:20231115-1,microsoft/orca-math-word-problems-200k,meta-math/MetaMathQA" --model_ids "augmxnt/shisa-gamma-7b-v1,WizardLM/WizardMath-7B-V1.1,arcee-train/Abel-7B-002-truncated-embeds" --base_model_name mistralai/Mistral-7B-v0.1 --cache_dir /home/ec2-user/.cache/huggingface --compute_logits True --dataset_id arcee-train/my-combined-dataset --base_model_dataset_name reflex-ai/fineweb-ultra-mini --example_count 1729 --max_length 2048 --add_top_k_logits  False
 ```
 
 #### Arguments:
 - `--k`: The number of top logits to compute and save. This is optional.
 - `--dataset_names`: List of dataset names corresponding to the datasets used to tune each model. Samples will be picked from each dataset.
+- `--base_model_dataset_name`: Name of the base model dataset. This is optional.
 - `--model_ids`: List of model IDs to load.
 - `--base_model_name`: Name of the base model.
 - `--cache_dir`: Directory to cache the models.
 - `--compute_logits`: If set to `True`, the top-K logits will be computed and saved. This is optional.
 - `--dataset_id`: ID of the dataset to push to Hugging Face Hub.
+- `--example_count`: Number of examples to select from each dataset.
+- `--max_length`: Maximum length of the tokenized examples.
+- `add_top_k_logits`: Add top-K logits to the combined dataset. Default is False.
+
 
 ### 3. Run the Training
 In this step, navigate to the `dam/train_dam.py` script. The purpose of this step is to train the coefficients. At the end of the training process, the model is merged into the base model architecture with the optimized coefficients. Additionally, this code has the capability to work with multiple GPUs.
@@ -81,4 +86,3 @@ python dam/train_dam.py --temperature <temperature> --weight_decay <weight_decay
 - `--hf_disk_dataset_dir`: Directory of the dataset with logits.
 - `--cache_dir`: Directory to cache the models.
 - `--base_model_name`: Name of the base model.
-

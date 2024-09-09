@@ -59,7 +59,6 @@ def setup_datasets_and_templates(tokenizer, dataset_names, example_count=None):
             dataset = load_dataset(base_name, config_version)
         else:
             dataset = load_dataset(dataset_name)
-
         # Select examples if example_count is provided
         if example_count:
             dataset = select_examples(dataset, example_count)
