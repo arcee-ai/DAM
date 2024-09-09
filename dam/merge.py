@@ -9,7 +9,7 @@ from glom import glom, Assign
 from tqdm import tqdm
 from huggingface_hub import HfApi
 
-def fix_config(save_path, num_models, non_linearity):
+def fix_config(save_path, num_models, non_linearity, merge_embedding_layers, merge_layernorms, uses_base_model):
 
     config_path = os.path.join(save_path, 'config.json')
     with open(config_path, 'r') as file:
@@ -24,13 +24,16 @@ def fix_config(save_path, num_models, non_linearity):
 
     data['num_merged_models'] = num_models
     data['non_linearity'] = non_linearity
+    data['dam_embedding_layer'] = merge_embedding_layers
+    data['dam_layernorms'] = merge_layernorms
+    data['uses_base_model'] = uses_base_model
 
     with open(config_path, 'w') as file:
         json.dump(data, file, indent=2)
 
     return config_path  # Return the updated config
 
-def merge_models(base_model_id, model_ids, output_path, device, use_base_model, non_linearity, use_embedding_layers, merge_layernorms, repo_id):
+def merge_models(base_model_id, model_ids, output_path, device, use_base_model, non_linearity, merge_embedding_layers, merge_layernorms, repo_id):
 
     print(f"Loading base model: {base_model_id}")
     merged_model = AutoModelForCausalLM.from_pretrained(base_model_id, torch_dtype=torch.bfloat16, device_map=device)
@@ -73,7 +76,7 @@ def merge_models(base_model_id, model_ids, output_path, device, use_base_model, 
             # Apply the assignment to the merged model, effectively inserting the merged DAMLayerNorm in place of the original layer
             glom(merged_model, assign)
 
-    if use_embedding_layers:
+    if merge_embedding_layers:
         embedding_module = find_embedding_layers(merged_model)
 
         modules = [glom(model, embedding_module[0]) for model in models]
@@ -147,7 +150,7 @@ def merge_models(base_model_id, model_ids, output_path, device, use_base_model, 
     merged_model.save_pretrained(output_path)
     tokenizer.save_pretrained(output_path)
 
-    fixed_config_path = fix_config(output_path, num_models=len(models), non_linearity=non_linearity)
+    fixed_config_path = fix_config(output_path, num_models=len(models), non_linearity=non_linearity, merge_embedding_layers=merge_embedding_layers, merge_layernorms=merge_layernorms, uses_base_model=use_base_model)
 
     # push to the hub
     tokenizer.push_to_hub(repo_id)

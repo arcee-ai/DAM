@@ -123,6 +123,9 @@ class MergedMistralConfig(PretrainedConfig):
         init_merger_values=[],
         use_tanh=False,
         model_index=None,
+        dam_embedding_layer=False,
+        dam_layernorms=False,
+        uses_base_model=False
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -149,6 +152,9 @@ class MergedMistralConfig(PretrainedConfig):
         self.init_merger_values = init_merger_values
         self.use_tanh = use_tanh
         self.model_index = model_index
+        self.dam_embedding_layer = dam_embedding_layer
+        self.dam_layernorms = dam_layernorms
+        self.uses_base_model = uses_base_model
 
         super().__init__(
             pad_token_id=pad_token_id,
