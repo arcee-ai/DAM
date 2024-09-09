@@ -65,7 +65,8 @@ Manual configurations are available at the top of the train_dam.py script.
 
 
 ```bash
-python dam/train_dam.py --temperature <temperature> --weight_decay <weight_decay> --learning_rate <learning_rate> --lr_scheduler_type <lr_scheduler_type> --lambda_coef_similarity <lambda_coef_similarity> --lambda_coef_l1 <lambda_coef_l1> --lambda_coef_l2 <lambda_coef_l2> --generate_logits_on_fly <generate_logits_on_fly> --use_all_logits <use_all_logits> --untrained_merged_model_name <untrained_merged_model_name> --hf_disk_dataset_dir <hf_disk_dataset_dir> --cache_dir <cache_dir> --base_model_name <base_model_name>
+python dam/train_dam.py --temperature 2.0 --weight_decay 0.01 --learning_rate 1e-2 --lr_scheduler_type linear --lambda_coef_similarity 0.01 --lambda_coef_l1 1e-6 --lambda_coef_l2 1e-5 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name arcee-train/merged-untrained --combined_hf_dataset_dir arcee-train/my-combined-dataset --cache_dir /home/ec2-user/.cache/huggingface --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True --loss_base_data_dist True
+
 ```
 
 #### Arguments:
@@ -83,6 +84,7 @@ python dam/train_dam.py --temperature <temperature> --weight_decay <weight_decay
 - `--generate_logits_on_fly`: Generate logits on-the-fly during training.
 - `--use_all_logits`: Use all logits during training.
 - `--untrained_merged_model_name`: Name of the untrained merged model.
-- `--hf_disk_dataset_dir`: Directory of the dataset with logits.
+- `--combined_hf_dataset_di`: Directory of the dataset with logits.
 - `--cache_dir`: Directory to cache the models.
 - `--base_model_name`: Name of the base model.
+- `--loss_base_data_dist`: Compute the distribution difference between the base model and merged model for the base data.

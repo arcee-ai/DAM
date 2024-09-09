@@ -69,6 +69,7 @@ class DAMTrainer(Trainer):
                  use_wandb=True,
                  generate_logits_on_fly=False,  # New parameter to control logits generation
                  use_all_logits=False,
+                 loss_with_base_data_dist=False,
                  **kwargs):
         super().__init__(model=model, **kwargs)
         self.lambda_coef_similarity = lambda_coef_similarity
@@ -83,7 +84,8 @@ class DAMTrainer(Trainer):
 
         self.base_model_path = base_model_path
         self.use_wandb = use_wandb
-        self.generate_logits_on_fly = generate_logits_on_fly  # Initialize the new parameter
+        self.generate_logits_on_fly = generate_logits_on_fly 
+        self.loss_with_base_data_dist = loss_with_base_data_dist
 
         assert not (self.use_all_logits and not self.generate_logits_on_fly), "You can't have use_all_logits=True if generate_logits_on_fly is False"
 
@@ -148,6 +150,7 @@ class DAMTrainer(Trainer):
         # Compute logits for each individual model with the respective dataset if generate_logits_on_fly is True
         if self.generate_logits_on_fly:
             individual_logits_dict = {}
+            
             # we do not compute logits for the base model
             for model_index in range(num_datasets):
                 # set the model index for the merged model to get correct logits from individual models.
@@ -160,7 +163,8 @@ class DAMTrainer(Trainer):
             
             # Reset model_index to None after computing logits for individual models
             set_model_index(merged_model, index=None)  # Reset model_index to None for merged model computations
-  
+   
+    
         total_loss = 0.0
         all_loss_logs = {}
 
