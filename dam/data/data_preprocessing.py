@@ -1,10 +1,9 @@
-from datasets import Dataset, DatasetDict
+from datasets import Dataset, DatasetDict, load_dataset
 from transformers import AutoTokenizer
 
 
-def preprocess_data(templated_datasets, model_name, cache_dir=None, max_length=2048):
+def preprocess_data(templated_datasets, model_name, cache_dir=None, max_length=2048, base_model_dataset_name=None):
     tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True, cache_dir=cache_dir)
-
     # Ensure the tokenizer has a padding token
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token  # Set pad_token to eos_token
@@ -21,6 +20,19 @@ def preprocess_data(templated_datasets, model_name, cache_dir=None, max_length=2
 
     # Tokenize and align each dataset
     tokenized_datasets = [ds.map(tokenize_and_align, batched=True, remove_columns=['text']) for ds in templated_datasets]
+
+    # If base_model_dataset_name is provided, load and tokenize it
+    if base_model_dataset_name:
+        base_model_dataset = load_dataset(base_model_dataset_name)
+
+        if "train" in base_model_dataset:
+            base_model_dataset = base_model_dataset["train"]
+
+        # Select the same number of rows as the other templated datasets
+        num_rows = len(tokenized_datasets[0])
+        base_model_dataset = base_model_dataset.select(range(num_rows))
+        base_model_tokenized = base_model_dataset.map(tokenize_and_align, batched=True, remove_columns=['text'])
+        tokenized_datasets.append(base_model_tokenized)
 
     # Combine datasets into one dataset with multiple input_ids and attention_mask columns
     combined_examples = []
@@ -44,6 +56,7 @@ def preprocess_data(templated_datasets, model_name, cache_dir=None, max_length=2
         combined_examples.append(combined_row)
 
     # Convert the combined examples into a new Dataset
+    # If the number of different input_ids is greater than the number of merged models, we will use a base model dataset.
     combined_dataset = Dataset.from_dict({key: [row[key] for row in combined_examples] for key in combined_examples[0].keys()})
-
+    
     return combined_dataset, tokenizer
