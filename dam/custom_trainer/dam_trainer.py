@@ -69,6 +69,7 @@ class DAMTrainer(Trainer):
                  use_wandb=True,
                  generate_logits_on_fly=False,  # New parameter to control logits generation
                  use_all_logits=False,
+                 loss_with_base_data_dist=False,
                  **kwargs):
         super().__init__(model=model, **kwargs)
         self.lambda_coef_similarity = lambda_coef_similarity
@@ -83,7 +84,8 @@ class DAMTrainer(Trainer):
 
         self.base_model_path = base_model_path
         self.use_wandb = use_wandb
-        self.generate_logits_on_fly = generate_logits_on_fly  # Initialize the new parameter
+        self.generate_logits_on_fly = generate_logits_on_fly 
+        self.loss_with_base_data_dist = loss_with_base_data_dist
 
         assert not (self.use_all_logits and not self.generate_logits_on_fly), "You can't have use_all_logits=True if generate_logits_on_fly is False"
 
@@ -148,7 +150,7 @@ class DAMTrainer(Trainer):
         # Compute logits for each individual model with the respective dataset if generate_logits_on_fly is True
         if self.generate_logits_on_fly:
             individual_logits_dict = {}
-            # we do not compute logits for the base model
+            # we do not compute logits for the base model as the default option
             for model_index in range(merged_model.num_merged_models - 1):
                 # set the model index for the merged model to get correct logits from individual models.
                 set_model_index(merged_model, index=model_index)
@@ -158,9 +160,26 @@ class DAMTrainer(Trainer):
                     model_logits = merged_model(input_ids=input_ids.cpu(), attention_mask=attention_mask.cpu()).logits
                 individual_logits_dict[model_index] = model_logits.to(device)
             
+            # Compute logits for the base model if loss_with_base_data_dist is True
+            if self.loss_with_base_data_dist:
+                # Last dataset is the base_dataset
+                set_model_index(merged_model, index=merged_model.num_merged_models - 1)
+                input_ids = input_ids_dict[f'input_ids_{num_datasets}']
+                attention_mask = attention_mask_dict[f'attention_mask_{num_datasets}']
+                with torch.no_grad():
+                    base_model_logits = merged_model(input_ids=input_ids.cpu(), attention_mask=attention_mask.cpu()).logits
+                individual_logits_dict[merged_model.num_merged_models - 1] = base_model_logits.to(device)
+
+                # Assertion to check if the number of datasets is equal to the keys of the logits dict
+                assert len(individual_logits_dict.keys()) == num_datasets, (
+                    "Mismatch between the number of datasets and the keys in individual_logits_dict. "
+                    "This indicates that logits for the base model with the base data distribution have not been correctly computed."
+                )
+            
             # Reset model_index to None after computing logits for individual models
             set_model_index(merged_model, index=None)  # Reset model_index to None for merged model computations
-  
+   
+    
         total_loss = 0.0
         all_loss_logs = {}
 
