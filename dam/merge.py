@@ -170,15 +170,15 @@ def main():
     parser.add_argument("model_ids", nargs='+', help="IDs of the models to merge (for linear layers)")
     parser.add_argument("--output_path", help="Path to save the merged model")
     parser.add_argument("--device", default="cpu", help="Device to use for computation (e.g., 'cpu', 'cuda')")
-    parser.add_argument("--use_embedding_layers", action='store_true', help="Include embedding layers in the merging process")
-    parser.add_argument("--use_base_model", action='store_true', help="Include base model's linear layers in the merging process")
-    parser.add_argument("--non_linearity", choices=['tanh', 'sigmoid', 'relu', None], default=None, help="Non-linearity to use in DAMLinearLayer")
+    parser.add_argument("--merge_embedding_layers", action='store_true', help="Include embedding layers in the merging process")
     parser.add_argument("--merge_layernorms", action='store_true', help="Include layer normalization layers in the merging process")
+    parser.add_argument("--use_base_model", action='store_true', help="Include base model's linear layers in the merging process")
+    parser.add_argument("--non_linearity", choices=['tanh', 'sigmoid', 'relu', 'None'], default=None, help="Non-linearity to use in DAMLinearLayer")
     parser.add_argument("--repo_id", required=True, help="Repository ID to push the merged model to")
 
     args = parser.parse_args()
 
-    merge_models(args.base_model_id, args.model_ids, args.output_path, args.device, args.use_base_model, args.non_linearity, args.use_embedding_layers, args.merge_layernorms, args.repo_id)
+    merge_models(args.base_model_id, args.model_ids, args.output_path, args.device, args.use_base_model, args.non_linearity, args.merge_embedding_layers, args.merge_layernorms, args.repo_id)
 
 if __name__ == "__main__":
     # os.environ['HF_TOKEN'] = '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'
@@ -190,4 +190,4 @@ if __name__ == "__main__":
     main()
 
 
-# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path ./merged_model --use_embedding_layers --use_base_model --non_linearity tanh --merge_layernorms --repo_id arcee-train/pplist-merged-untrained-with-base-layernorm-embedding
+# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path ./merged_model --merge_embedding_layers --use_base_model --non_linearity tanh --merge_layernorms --repo_id arcee-train/pplist-merged-untrained-with-base-layernorm-embedding

@@ -17,7 +17,7 @@ In this step, we assign a trainable coefficient for each column of each model's 
 
 
 ```bash
-python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path ./merged_model --use_embedding_layers --use_base_model --non_linearity tanh --merge_layernorms --repo_id arcee-train/pplist-merged-untrained-with-base-layernorm-embedding
+python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path ./merged_model --merge_embedding_layers --merge_layernorms --use_base_model --non_linearity "None"  --repo_id arcee-train/pplist-merged-untrained-with-base-layernorm-embedding
 ```
 
 #### Arguments:
@@ -25,10 +25,10 @@ python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM
 - `model_ids`: IDs of the models to merge. The linear layers from these models will be used.
 - `--output_path`: Path where the merged model will be saved.
 - `--device`: Device to use for computation (e.g., 'cpu', 'cuda').
-- `--use_embedding_layers`: If specified, embedding layers will be included in the merging process.
+- `--merge_embedding_layers`: If specified, embedding layers will be included in the merging process.
+- `--merge_layernorms`: If specified, layer normalization layers will be included in the merging process.
 - `--use_base_model`: If specified, trainable coefficients will also be added to the base model's linear layers. This is optional.
 - `--non_linearity`: Specifies the non-linearity to use in the DAMLinearLayer. Options are `tanh`, `sigmoid`, `relu`, or `None`.
-- `--merge_layernorms`: If specified, layer normalization layers will be included in the merging process.
 - `--repo_id`: Repository ID where the merged model will be pushed.shed.
 
 ### 2. Prepare the Dataset
