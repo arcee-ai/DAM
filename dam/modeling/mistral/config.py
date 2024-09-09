@@ -125,7 +125,7 @@ class MergedMistralConfig(PretrainedConfig):
         model_index=None,
         dam_embedding_layer=False,
         dam_layernorms=False,
-        uses_base_model=False
+        uses_base_model=False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
