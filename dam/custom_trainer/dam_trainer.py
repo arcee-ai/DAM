@@ -69,7 +69,6 @@ class DAMTrainer(Trainer):
                  use_wandb=True,
                  generate_logits_on_fly=False,  # New parameter to control logits generation
                  use_all_logits=False,
-                 loss_with_base_data_dist=False,
                  **kwargs):
         super().__init__(model=model, **kwargs)
         self.lambda_coef_similarity = lambda_coef_similarity
@@ -85,7 +84,6 @@ class DAMTrainer(Trainer):
         self.base_model_path = base_model_path
         self.use_wandb = use_wandb
         self.generate_logits_on_fly = generate_logits_on_fly 
-        self.loss_with_base_data_dist = loss_with_base_data_dist
 
         assert not (self.use_all_logits and not self.generate_logits_on_fly), "You can't have use_all_logits=True if generate_logits_on_fly is False"
 
