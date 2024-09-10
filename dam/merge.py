@@ -59,55 +59,55 @@ def merge_models(base_model_id,
 
     tokenizer = AutoTokenizer.from_pretrained(base_model_id, use_fast=True)
 
-    if merge_layernorms:
-        norm_modules = find_norm_layers(merged_model)
+    norm_modules = find_norm_layers(merged_model)
 
-        # Step 1: Identify all the norm layers in the merged model that need to be processed.
-        for m in tqdm(norm_modules, desc="Merging layer norms"):
+    # Step 1: Identify all the norm layers in the merged model that need to be processed.
+    for m in tqdm(norm_modules, desc="Processing layer norms"):
 
-            # Step 2: For the current layer, gather the corresponding norm layers from each model that is being merged.
-            modules = [glom(model, m) for model in models]
+        # Step 2: For the current layer, gather the corresponding norm layers from each model that is being merged.
+        modules = [glom(model, m) for model in models]
 
-            # Step 3: Create a new DAMRMSNorm that will be used to combine the weights from the models.
-            dam_layernorm = DAMRMSNorm(
-                normalized_shape=modules[0].weight.shape[0],
-                num_models=len(models),
-                eps=modules[0].variance_epsilon,
-                dtype=modules[0].weight.dtype,
-                non_linearity=non_linearity,  # Set non_linearity based on user input
-                use_random_init=norm_merge_random  # Pass random_init based on argument
-            ).to(device)
-
-            # Loop over each module (i.e., norm layer) from the models being merged
-            for i, module in enumerate(modules):
-                # Assign the weights from the current model's layer to the corresponding slot in DAMLayerNorm
-                dam_layernorm.weights[i].data = module.weight.data
-                
-            # Create an assignment operation to replace the original norm layer with the merged DAMLayerNorm
-            assign = Assign(m, dam_layernorm)
-            
-            # Apply the assignment to the merged model, effectively inserting the merged DAMLayerNorm in place of the original layer
-            glom(merged_model, assign)
-
-    if merge_embedding_layers:
-        embedding_module = find_embedding_layers(merged_model)
-
-        modules = [glom(model, embedding_module[0]) for model in models]
-
-        dam_embedding_layer = DAMEmbeddingLayer(
-            num_embeddings=modules[0].num_embeddings,
-            embedding_dim=modules[0].embedding_dim,
+        # Step 3: Create a new DAMRMSNorm that will be used to combine the weights from the models.
+        dam_layernorm = DAMRMSNorm(
+            normalized_shape=modules[0].weight.shape[0],
             num_models=len(models),
+            eps=modules[0].variance_epsilon,
             dtype=modules[0].weight.dtype,
             non_linearity=non_linearity,  # Set non_linearity based on user input
-            use_random_init=embedding_merge_random  # Pass random_init based on argument
+            use_random_init=norm_merge_random,  # Pass random_init based on argument
+            use_in_merging=merge_layernorms  # Pass use_in_merging to the class
         ).to(device)
 
-        for i, module in enumerate(tqdm(modules, desc="Merging embedding layers")):
-            dam_embedding_layer.embeddings[i].data = module.weight.data  # Corrected assignment
-
-        assign = Assign(embedding_module[0], dam_embedding_layer)
+        # Loop over each module (i.e., norm layer) from the models being merged
+        for i, module in enumerate(modules):
+            # Assign the weights from the current model's layer to the corresponding slot in DAMLayerNorm
+            dam_layernorm.weights[i].data = module.weight.data
+                
+        # Create an assignment operation to replace the original norm layer with the merged DAMRMSNorm
+        assign = Assign(m, dam_layernorm)
+        
+        # Apply the assignment to the merged model, effectively inserting the merged DAMRMSNorm in place of the original layer
         glom(merged_model, assign)
+
+    embedding_module = find_embedding_layers(merged_model)
+
+    modules = [glom(model, embedding_module[0]) for model in models]
+
+    dam_embedding_layer = DAMEmbeddingLayer(
+        num_embeddings=modules[0].num_embeddings,
+        embedding_dim=modules[0].embedding_dim,
+        num_models=len(models),
+        dtype=modules[0].weight.dtype,
+        non_linearity=non_linearity,  # Set non_linearity based on user input
+        use_random_init=embedding_merge_random,  # Pass random_init based on argument
+        use_in_merging=merge_embedding_layers  # Pass use_in_merging to the class
+    ).to(device)
+
+    for i, module in enumerate(tqdm(modules, desc="Merging embedding layers")):
+        dam_embedding_layer.embeddings[i].data = module.weight.data  # Corrected assignment
+
+    assign = Assign(embedding_module[0], dam_embedding_layer)
+    glom(merged_model, assign)
 
     # Step 1: Identify all the linear layers in the merged model that need to be processed.
     linear_modules = find_linear_layers(merged_model)
@@ -133,7 +133,8 @@ def merge_models(base_model_id,
             bias=modules[0].bias is not None,
             dtype=modules[0].weight.dtype,
             non_linearity=non_linearity,  # Set non_linearity based on user input
-            use_random_init=linear_merge_random  # Pass random_init based on argument
+            use_random_init=linear_merge_random,  # Pass random_init based on argument
+            use_in_merging=True  # Always set use_in_merging to True for linear layers
         ).to(device)
 
 
