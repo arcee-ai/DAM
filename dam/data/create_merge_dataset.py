@@ -120,7 +120,7 @@ def main(k, dataset_names, model_ids, base_model_name, cache_dir, compute_logits
         models_dict = load_models(model_ids, cache_dir)
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        combined_dataset = compute_and_save_topk_logits(models_dict, combined_dataset, device, batch_size=4, top_k=k, compute_logits=compute_logits)
+        combined_dataset = compute_and_save_topk_logits(models_dict, combined_dataset, device, batch_size=32, top_k=k, compute_logits=compute_logits)
 
         # Save the dataset with logits to disk
         dataset_path = f"./DAM_logits_k_{k}"

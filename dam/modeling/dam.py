@@ -14,9 +14,10 @@ class DAMBaseLayer(nn.Module):
         num_models=3,
         init_merger_values=[],
         dtype=None,
-        non_linearity: str = 'tanh',  # Option to apply non-linearity
+        non_linearity: str = 'None',  # Option to apply non-linearity
         model_index: Optional[int] = None,
         is_embedding: bool = False,  # Flag to indicate if this is an embedding layer
+        use_random_init: bool = False,  # Flag to indicate if random initialization should be used
     ):
         super().__init__()
 
@@ -27,8 +28,11 @@ class DAMBaseLayer(nn.Module):
         # Store the non-linearity to be applied on the merging coefficients
         self.non_linearity = non_linearity
 
+        # If use_random_init is True, initialize the merger values with random numbers normalized between 0 and 1
+        if use_random_init:
+            init_merger_values = torch.rand(num_models).tolist()
         # If no initial values are provided, set equal initial merger values for each model
-        if init_merger_values == []:
+        elif init_merger_values == []:
             init_merger_values = [1/num_models] * num_models
 
         # Store the initial merger values
@@ -130,6 +134,7 @@ class DAMLinearLayer(DAMBaseLayer):
         dtype=None,
         non_linearity: str = 'tanh',  # Option to apply non-linearity   
         model_index: Optional[int] = None,
+        use_random_init: bool = False,  # Flag to indicate if random initialization should be used
     ):
         super().__init__(
             in_features=in_features,
@@ -140,6 +145,7 @@ class DAMLinearLayer(DAMBaseLayer):
             non_linearity=non_linearity,
             model_index=model_index,
             is_embedding=False,  # This is not an embedding layer
+            use_random_init=use_random_init,  # Pass the flag to the base class
         )
 
         # Initialize the list of weights for each model's layer
@@ -196,6 +202,7 @@ class DAMEmbeddingLayer(DAMBaseLayer):
         non_linearity: str = 'tanh',  # Option to apply non-linearity
         model_index: Optional[int] = None,
         padding_idx: Optional[int] = None,
+        use_random_init: bool = False,  # Flag to indicate if random initialization should be used
     ):
         super().__init__(
             in_features=embedding_dim,
@@ -206,6 +213,7 @@ class DAMEmbeddingLayer(DAMBaseLayer):
             non_linearity=non_linearity,
             model_index=model_index,
             is_embedding=True,  # This is an embedding layer
+            use_random_init=use_random_init,  # Pass the flag to the base class
         )
 
         # Initialize the list of embeddings for each model's layer as nn.Embedding
@@ -243,6 +251,7 @@ class DAMRMSNorm(DAMBaseLayer):
         dtype=None,
         non_linearity: str = 'tanh',  # Option to apply non-linearity
         model_index: Optional[int] = None,
+        use_random_init: bool = False,  # Flag to indicate if random initialization should be used
     ):
         super().__init__(
             in_features=normalized_shape,
@@ -253,6 +262,7 @@ class DAMRMSNorm(DAMBaseLayer):
             non_linearity=non_linearity,
             model_index=model_index,
             is_embedding=False,  # This is not an embedding layer
+            use_random_init=use_random_init,  # Pass the flag to the base class
         )
 
         self.eps = eps

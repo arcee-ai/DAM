@@ -33,7 +33,19 @@ def fix_config(save_path, num_models, non_linearity, merge_embedding_layers, mer
 
     return config_path  # Return the updated config
 
-def merge_models(base_model_id, model_ids, output_path, device, use_base_model, non_linearity, merge_embedding_layers, merge_layernorms, repo_id):
+def merge_models(base_model_id, 
+                 model_ids, 
+                 output_path, 
+                 device, 
+                 use_base_model, 
+                 non_linearity, 
+                 merge_embedding_layers, 
+                 merge_layernorms, 
+                 repo_id, 
+                 embedding_merge_random, 
+                 linear_merge_random, 
+                 norm_merge_random
+                 ):
 
     print(f"Loading base model: {base_model_id}")
     merged_model = AutoModelForCausalLM.from_pretrained(base_model_id, torch_dtype=torch.bfloat16, device_map=device)
@@ -62,7 +74,8 @@ def merge_models(base_model_id, model_ids, output_path, device, use_base_model, 
                 num_models=len(models),
                 eps=modules[0].variance_epsilon,
                 dtype=modules[0].weight.dtype,
-                non_linearity=non_linearity  # Set non_linearity based on user input
+                non_linearity=non_linearity,  # Set non_linearity based on user input
+                use_random_init=norm_merge_random  # Pass random_init based on argument
             ).to(device)
 
             # Loop over each module (i.e., norm layer) from the models being merged
@@ -86,7 +99,8 @@ def merge_models(base_model_id, model_ids, output_path, device, use_base_model, 
             embedding_dim=modules[0].embedding_dim,
             num_models=len(models),
             dtype=modules[0].weight.dtype,
-            non_linearity=non_linearity  # Set non_linearity based on user input
+            non_linearity=non_linearity,  # Set non_linearity based on user input
+            use_random_init=embedding_merge_random  # Pass random_init based on argument
         ).to(device)
 
         for i, module in enumerate(tqdm(modules, desc="Merging embedding layers")):
@@ -118,7 +132,8 @@ def merge_models(base_model_id, model_ids, output_path, device, use_base_model, 
             num_models=len(models),
             bias=modules[0].bias is not None,
             dtype=modules[0].weight.dtype,
-            non_linearity=non_linearity  # Set non_linearity based on user input
+            non_linearity=non_linearity,  # Set non_linearity based on user input
+            use_random_init=linear_merge_random  # Pass random_init based on argument
         ).to(device)
 
 
@@ -178,10 +193,25 @@ def main():
     parser.add_argument("--use_base_model", action='store_true', help="Include base model's linear layers in the merging process")
     parser.add_argument("--non_linearity", choices=['tanh', 'sigmoid', 'relu', 'None'], default=None, help="Non-linearity to use in DAMLinearLayer")
     parser.add_argument("--repo_id", required=True, help="Repository ID to push the merged model to")
+    parser.add_argument("--embedding_merge_random", action='store_true', help="Use random initialization for embedding layers")
+    parser.add_argument("--linear_merge_random", action='store_true', help="Use random initialization for linear layers")
+    parser.add_argument("--norm_merge_random", action='store_true', help="Use random initialization for normalization layers")
 
     args = parser.parse_args()
 
-    merge_models(args.base_model_id, args.model_ids, args.output_path, args.device, args.use_base_model, args.non_linearity, args.merge_embedding_layers, args.merge_layernorms, args.repo_id)
+    merge_models(args.base_model_id, 
+                args.model_ids, 
+                args.output_path, 
+                args.device, 
+                args.use_base_model, 
+                args.non_linearity, 
+                args.merge_embedding_layers, 
+                args.merge_layernorms, 
+                args.repo_id, 
+                args.embedding_merge_random, 
+                args.linear_merge_random, 
+                args.norm_merge_random
+               )
 
 if __name__ == "__main__":
     # os.environ['HF_TOKEN'] = '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'
@@ -193,4 +223,4 @@ if __name__ == "__main__":
     main()
 
 
-# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path ./merged_model --merge_embedding_layers --use_base_model --non_linearity tanh --merge_layernorms --repo_id arcee-train/pplist-merged-untrained-with-base-layernorm-embedding
+# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path ./merged_model --merge_embedding_layers --use_base_model --non_linearity tanh --merge_layernorms --repo_id arcee-train/pplist-merged-untrained-with-base-layernorm-embedding --em_merge_random --linear_merge_random --norm_merge_random
