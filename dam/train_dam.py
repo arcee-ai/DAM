@@ -26,9 +26,9 @@ loss_fns = {
 
 # Command line arguments allow for WandB Sweep
 @click.command()
-@click.option("--temperature", default=2.0, help="Temperature for KL divergence.")
-@click.option("--weight_decay", default=0.01, help="Weight decay for the optimizer.")
-@click.option("--learning_rate", default=1e-2, help="Learning rate for the optimizer.")
+@click.option("--temperature", default=1.5, help="Temperature for KL divergence.")
+@click.option("--weight_decay", default=0.0, help="Weight decay for the optimizer.")
+@click.option("--learning_rate", default=1e-3, help="Learning rate for the optimizer.")
 @click.option("--lr_scheduler_type", default="linear", help="Type of learning rate scheduler (`linear`, etc.).")
 @click.option("--lambda_coef_similarity", default=0.01, help="Lambda coefficient for similarity regularization.")
 @click.option("--lambda_coef_l1", default=1e-6, help="L1 regularization coefficient.")
@@ -119,3 +119,5 @@ def main(temperature, weight_decay, learning_rate,
 
 if __name__ == "__main__":
     main()
+
+# python dam/train_dam.py --temperature 2.0 --weight_decay 0.0 --learning_rate 1e-2 --lr_scheduler_type linear --lambda_coef_similarity 0.01 --lambda_coef_l1 0.0 --lambda_coef_l2 0.0 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name /home/ec2-user/shamane/DAM/merged_model  --combined_hf_dataset_dir arcee-train/my-combined-dataset --cache_dir /home/ec2-user/.cache/huggingface --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True

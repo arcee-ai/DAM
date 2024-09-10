@@ -17,7 +17,7 @@ In this step, we assign a trainable coefficient for each column of each model's 
 
 
 ```bash
-python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path ./merged_model --merge_embedding_layers --merge_layernorms --use_base_model --non_linearity "None"  --repo_id arcee-train/pplist-merged-untrained-with-base-layernorm-embedding
+python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path ./merged_model --merge_embedding_layers --merge_layernorms --use_base_model --non_linearity "None" --embedding_merge_random --linear_merge_random --repo_id arcee-train/untrained-merged-random-coeffs
 ```
 
 #### Arguments:
@@ -29,7 +29,10 @@ python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM
 - `--merge_layernorms`: If specified, layer normalization layers will be included in the merging process.
 - `--use_base_model`: If specified, trainable coefficients will also be added to the base model's linear layers. This is optional.
 - `--non_linearity`: Specifies the non-linearity to use in the DAMLinearLayer. Options are `tanh`, `sigmoid`, `relu`, or `None`.
-- `--repo_id`: Repository ID where the merged model will be pushed.shed.
+- `--repo_id`: Repository ID where the merged model will be pushed.
+- `--embedding_merge_random`: If specified, co-effs for the embedding layers will be initialized randomly.
+- `--linear_merge_random`: If specified, co-effs for the linear layers will be initialized randomly.
+- `--norm_merge_random`: If specified, co-effs for the layer normalization layers will be initialized randomly.
 
 ### 2. Prepare the Dataset
 
@@ -65,7 +68,7 @@ Manual configurations are available at the top of the train_dam.py script.
 
 
 ```bash
-python dam/train_dam.py --temperature 2.0 --weight_decay 0.01 --learning_rate 1e-2 --lr_scheduler_type linear --lambda_coef_similarity 0.01 --lambda_coef_l1 1e-6 --lambda_coef_l2 1e-5 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name arcee-train/merged-untrained --combined_hf_dataset_dir arcee-train/my-combined-dataset --cache_dir /home/ec2-user/.cache/huggingface --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True
+python dam/train_dam.py --temperature 2.0 --weight_decay 0.0 --learning_rate 1e-2 --lr_scheduler_type linear --lambda_coef_similarity 0.01 --lambda_coef_l1 0.0 --lambda_coef_l2 0.0 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name arcee-train/merged-untrained --combined_hf_dataset_dir arcee-train/my-combined-dataset --cache_dir /home/ec2-user/.cache/huggingface --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True
 
 ```
 
