@@ -40,11 +40,10 @@ loss_fns = {
 @click.option("--combined_hf_dataset_dir", default="arcee-train/logits-dataset-full-set-top-50", help="Directory of the dataset with logits.")
 @click.option("--cache_dir", default="/home/ec2-user/.cache/huggingface", help="Directory to cache the models.")
 @click.option("--base_model_name", default="mistralai/Mistral-7B-v0.1", help="Name of the base model.")
-@click.option("--loss_base_data_dist",  default=False, help="Compute the distribution difference between the base model and merged model for the base data.")
 def main(temperature, weight_decay, learning_rate, 
          lr_scheduler_type, lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2,
          use_wandb, generate_logits_on_fly, use_all_logits,
-         untrained_merged_model_name, combined_hf_dataset_dir, cache_dir, base_model_name, loss_base_data_dist):
+         untrained_merged_model_name, combined_hf_dataset_dir, cache_dir, base_model_name):
     # Model and dataset details
     
     # Setup tokenizer
@@ -56,16 +55,6 @@ def main(temperature, weight_decay, learning_rate,
 
     # Prepare the model
     model = prepare_model(untrained_merged_model_name, cache_dir=cache_dir)
-
-    print(f"The number of merged models is: {model.num_merged_models}")
-
-    # Check if we need to validate the base model dataset
-    if generate_logits_on_fly and loss_base_data_dist:
-        unique_input_ids = len(set(col for col in dataset.column_names if col.startswith('input_ids_')))
-        if model.num_merged_models != unique_input_ids:
-            raise AssertionError("Either you do not have base model related data in the dataset or you don't have the merged_model where you can switch to the base model.")
-        else:
-            print("You can successfully compute loss with the base model data distribution.")
 
     # Training arguments
     training_args = TrainingArguments(
@@ -107,7 +96,6 @@ def main(temperature, weight_decay, learning_rate,
         generate_logits_on_fly=generate_logits_on_fly,
         use_all_logits=use_all_logits,
         use_wandb=use_wandb,
-        loss_with_base_data_dist=loss_base_data_dist  # Compute distribution difference between base and merged model
     )
 
     if use_wandb:
