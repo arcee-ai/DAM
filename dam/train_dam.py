@@ -34,6 +34,8 @@ loss_fns = {
 @click.option("--lambda_coef_similarity", default=0.01, help="Lambda coefficient for similarity regularization.")
 @click.option("--lambda_coef_l1", default=1e-6, help="L1 regularization coefficient.")
 @click.option("--lambda_coef_l2", default=1e-5, help="L2 regularization coefficient.")
+@click.option("--per_device_train_batch_size", default=4, help="Per device train batch size.")
+@click.option("--gradient_accumulation_steps", default=8, help="Number of gradient accumulation steps.")
 @click.option("--use_wandb", default=True, help="Upload training logs to Weights and Biases.")
 @click.option("--generate_logits_on_fly", default=True, help="Generate logits on-the-fly during training.")
 @click.option("--use_all_logits", default=True, help="Use all logits during training.")
@@ -43,7 +45,7 @@ loss_fns = {
 @click.option("--base_model_name", default="mistralai/Mistral-7B-v0.1", help="Name of the base model.")
 def main(temperature, weight_decay, learning_rate, 
          lr_scheduler_type, warmup_ratio, lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2,
-         use_wandb, generate_logits_on_fly, use_all_logits,
+         per_device_train_batch_size, gradient_accumulation_steps, use_wandb, generate_logits_on_fly, use_all_logits,
          untrained_merged_model_name, combined_hf_dataset_dir, cache_dir, base_model_name):
     # Model and dataset details
     
@@ -64,7 +66,7 @@ def main(temperature, weight_decay, learning_rate,
         save_strategy="no",
         do_eval=False,
         learning_rate=learning_rate,
-        per_device_train_batch_size=4,
+        per_device_train_batch_size=per_device_train_batch_size,
         per_device_eval_batch_size=1,
         num_train_epochs=3,
         # max_steps=10,
@@ -78,7 +80,7 @@ def main(temperature, weight_decay, learning_rate,
         logging_steps=1,
         logging_strategy="steps",
         report_to="wandb" if use_wandb else "tensorboard",
-        gradient_accumulation_steps=8,
+        gradient_accumulation_steps=gradient_accumulation_steps,
         max_grad_norm=1.0,
     )
 
