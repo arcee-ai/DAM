@@ -17,7 +17,7 @@ In this step, we assign a trainable coefficient for each column of each model's 
 
 
 ```bash
-python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path ./merged_model  --use_base_model --non_linearity None --repo_id arcee-train/shamane-latest-untrained-merge
+python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path ./merged_model  --use_base_model --repo_id arcee-train/shamane-latest-untrained-merge --use_base_model
 ```
 
 #### Arguments:
@@ -25,14 +25,8 @@ python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM
 - `model_ids`: IDs of the models to merge. The linear layers from these models will be used.
 - `--output_path`: Path where the merged model will be saved.
 - `--device`: Device to use for computation (e.g., 'cpu', 'cuda').
-- `--merge_embedding_layers`: If specified, embedding layers will be included in the merging process.
-- `--merge_layernorms`: If specified, layer normalization layers will be included in the merging process.
-- `--use_base_model`: If specified, trainable coefficients will also be added to the base model's linear layers. This is optional.
-- `--non_linearity`: Specifies the non-linearity to use in the DAMLinearLayer. Options are `tanh`, `sigmoid`, `relu`, or `None`.
 - `--repo_id`: Repository ID where the merged model will be pushed.
-- `--embedding_merge_random`: If specified, co-effs for the embedding layers will be initialized randomly.
-- `--linear_merge_random`: If specified, co-effs for the linear layers will be initialized randomly.
-- `--norm_merge_random`: If specified, co-effs for the layer normalization layers will be initialized randomly.
+- `--use_base_model`: If specified, trainable coefficients will also be added to the base model's linear layers. This is optional.
 
 ### 2. Prepare the Dataset
 
@@ -41,11 +35,10 @@ To prepare the dataset, navigate to the `dam/data` folder and run `create_merge_
 #### Command:
 
 ```bash
-python dam/data/create_merge_dataset.py --k 50 --dataset_names "p1atdev/ichikara-instruction:20231115-1,microsoft/orca-math-word-problems-200k,meta-math/MetaMathQA" --model_ids "augmxnt/shisa-gamma-7b-v1,WizardLM/WizardMath-7B-V1.1,arcee-train/Abel-7B-002-truncated-embeds" --base_model_name mistralai/Mistral-7B-v0.1 --cache_dir /home/ec2-user/.cache/huggingface --compute_logits True --dataset_id arcee-train/my-combined-dataset --base_model_dataset_name reflex-ai/fineweb-ultra-mini --example_count 1729 --max_length 2048 --add_top_k_logits  False
+python dam/data/create_merge_dataset.py  --dataset_names "p1atdev/ichikara-instruction:20231115-1,microsoft/orca-math-word-problems-200k,meta-math/MetaMathQA" --base_model_dataset_name "reflex-ai/fineweb-ultra-mini"  --model_ids "augmxnt/shisa-gamma-7b-v1,WizardLM/WizardMath-7B-V1.1,arcee-train/Abel-7B-002-truncated-embeds" --base_model_name mistralai/Mistral-7B-v0.1 --cache_dir /home/ec2-user/.cache/huggingface --compute_logits True --dataset_id arcee-train/my-combined-dataset --base_model_dataset_name reflex-ai/fineweb-ultra-mini --example_count 1729 --max_length 2048 --add_top_k_logits  False
 ```
 
 #### Arguments:
-- `--k`: The number of top logits to compute and save. This is optional.
 - `--dataset_names`: List of dataset names corresponding to the datasets used to tune each model. Samples will be picked from each dataset.
 - `--base_model_dataset_name`: Name of the base model dataset. This is optional.
 - `--model_ids`: List of model IDs to load.
@@ -56,7 +49,7 @@ python dam/data/create_merge_dataset.py --k 50 --dataset_names "p1atdev/ichikara
 - `--example_count`: Number of examples to select from each dataset.
 - `--max_length`: Maximum length of the tokenized examples.
 - `--add_top_k_logits`: Add top-K logits to the combined dataset. The default is False.
-
+- `--base_model_dataset_name`: Name of the base model dataset. This is optional. (if you do not want your to involve base model please do not specify this argument)
 
 ### 3. Run the Training
 In this step, navigate to the `dam/train_dam.py` script. The purpose of this step is to train the coefficients. At the end of the training process, the model is merged into the base model architecture with the optimized coefficients. Additionally, this code has the capability to work with multiple GPUs.
@@ -68,7 +61,7 @@ Manual configurations are available at the top of the train_dam.py script.
 
 
 ```bash
-python dam/train_dam.py --temperature 2.0 --weight_decay 0.0 --learning_rate 1e-2 --lr_scheduler_type linear --lambda_coef_similarity 0.01 --lambda_coef_l1 0.0 --lambda_coef_l2 0.0 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name arcee-train/merged-untrained --combined_hf_dataset_dir arcee-train/my-combined-dataset --cache_dir /home/ec2-user/.cache/huggingface --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True
+python dam/train_dam.py --temperature 2.0 --weight_decay 0.0 --learning_rate 1e-4 --lr_scheduler_type cosine --lambda_coef_similarity 0.01 --lambda_coef_l1 0.0 --lambda_coef_l2 0.0 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name arcee-train/merged-untrained --combined_hf_dataset_dir arcee-train/my-combined-dataset --cache_dir /home/ec2-user/.cache/huggingface --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True --warmup_ratio 0.1
 
 ```
 
