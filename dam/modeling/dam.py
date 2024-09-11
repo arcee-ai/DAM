@@ -41,13 +41,16 @@ class DAMBaseLayer(nn.Module):
 
         # Initialize the list of merging coefficients for each model's layer
         self.mergers = nn.ParameterList([Parameter(
-            torch.ones(in_features, dtype=dtype) * init_merger_values[i]
+            torch.ones(in_features, dtype=dtype) * init_merger_values[i],
+            requires_grad=use_in_merging  # Set requires_grad based on merging
         ) for i in range(num_models)])
 
-        # Store the flag indicating if this layer should be used in merging
-        self.use_in_merging = use_in_merging
-
     def compute_mergers_overlap(self, lambda_coef_overlap=0.000001):
+        # Check if any merger requires gradient
+        if all(not merger.requires_grad for merger in self.mergers):
+            device = self.mergers[0].device
+            return  torch.tensor(0.0, device=device)
+        
         # Initialize similarity loss
         overlap_loss = 0.0
         
@@ -70,8 +73,10 @@ class DAMBaseLayer(nn.Module):
 
     # Method to compute the similarity between merging coefficients
     def compute_mergers_similarity(self, lambda_coef=None):
-        if lambda_coef is None:
-            return 0.0
+        # Check if any merger requires gradient
+        if lambda_coef is None or all(not merger.requires_grad for merger in self.mergers):
+            device = self.mergers[0].device
+            return  torch.tensor(0.0, device=device)
     
         # Initialize similarity loss
         similarity_loss = 0.0
@@ -95,6 +100,10 @@ class DAMBaseLayer(nn.Module):
 
     # Method to compute L1 and L2 regularization on the merging coefficients
     def compute_mergers_L1_L2_reg(self, lambda_coef_l1=None, lambda_coef_l2=None):
+        # Check if any merger requires gradient
+        if all(not merger.requires_grad for merger in self.mergers):
+            return torch.tensor(0.0, device=self.mergers[0].device)
+
         device = self.mergers[0].device
         l1_reg = torch.tensor(0.0, device=device)
         l2_reg = torch.tensor(0.0, device=device)
@@ -109,11 +118,6 @@ class DAMBaseLayer(nn.Module):
 
         # Return the combined L1 and L2 regularization loss
         return l1_reg + l2_reg
-
-    # Method to unfreeze the merging coefficients so they can be trained
-    def unfreeze(self):
-        for merger in self.mergers:
-            merger.requires_grad = True
 
     # Method to apply the specified non-linearity to the merging coefficients
     def apply_non_linearity(self, tensor):
@@ -139,7 +143,7 @@ class DAMLinearLayer(DAMBaseLayer):
         non_linearity: str = 'tanh',  # Option to apply non-linearity   
         model_index: Optional[int] = None,
         use_random_init: bool = False,  # Flag to indicate if random initialization should be used
-        use_in_merging: bool = False,  # Flag to indicate if this layer should be used in merging
+        use_in_merging: bool = True,  # Flag to indicate if this layer should be used in merging
     ):
         super().__init__(
             in_features=in_features,
@@ -156,13 +160,14 @@ class DAMLinearLayer(DAMBaseLayer):
 
         # Initialize the list of weights for each model's layer
         self.weights = nn.ParameterList([Parameter(
-            torch.zeros(out_features, in_features, dtype=dtype) * self.init_merger_values[i]
+            torch.zeros(out_features, in_features, dtype=dtype),
+            requires_grad=False  # Freeze weights
         ) for i in range(num_models)])
 
         # If the layer has a bias, initialize the list of biases and bias mergers for each model
         if bias:
-            self.biases = nn.ParameterList([nn.Parameter(torch.zeros(out_features, dtype=dtype) * self.init_merger_values[i]) for i in range(num_models)])
-            self.bias_mergers = nn.ParameterList([nn.Parameter(torch.ones(1, dtype=dtype) * self.init_merger_values[i]) for i in range(num_models)])
+            self.biases = nn.ParameterList([nn.Parameter(torch.zeros(out_features, dtype=dtype), requires_grad=False) for i in range(num_models)])
+            self.bias_mergers = nn.ParameterList([nn.Parameter(torch.ones(1, dtype=dtype), requires_grad=use_in_merging) for i in range(num_models)])
 
     # Method to compute the combined weight for the merged layer
     def get_dam_weight(self):
@@ -226,7 +231,8 @@ class DAMEmbeddingLayer(DAMBaseLayer):
 
         # Initialize the list of embeddings for each model's layer as nn.Embedding
         self.embeddings = nn.ParameterList([Parameter(
-            torch.zeros(num_embeddings, embedding_dim, dtype=dtype) * self.init_merger_values[i]
+            torch.zeros(num_embeddings, embedding_dim, dtype=dtype),
+            requires_grad=False  # Freeze embeddings
         ) for i in range(num_models)])
 
     # Method to compute the combined embedding for the merged layer
@@ -279,7 +285,8 @@ class DAMRMSNorm(DAMBaseLayer):
 
         # Initialize the list of weights for each model's layer normalization
         self.weights = nn.ParameterList([Parameter(
-            torch.ones(normalized_shape, dtype=dtype) * self.init_merger_values[i]
+            torch.ones(normalized_shape, dtype=dtype),
+            requires_grad=False  # Freeze weights
         ) for i in range(num_models)])
 
     # Method to compute the combined weight for the merged layer normalization

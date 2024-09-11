@@ -9,6 +9,8 @@ from glom import glom, Assign
 from tqdm import tqdm
 from huggingface_hub import HfApi
 
+os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
+
 def fix_config(save_path, num_models, non_linearity, merge_embedding_layers, merge_layernorms, uses_base_model):
 
     config_path = os.path.join(save_path, 'config.json')
@@ -24,9 +26,11 @@ def fix_config(save_path, num_models, non_linearity, merge_embedding_layers, mer
 
     data['num_merged_models'] = num_models
     data['non_linearity'] = non_linearity
-    data['dam_embedding_layer'] = merge_embedding_layers
-    data['dam_layernorms'] = merge_layernorms
+    data['dam_embedding_layer'] = True  # Set to True as per instruction
+    data['dam_layernorms'] = True  # Set to True as per instruction
     data['uses_base_model'] = uses_base_model
+    data['is_embedding_coef_trainable'] = merge_embedding_layers  # New variable to indicate if embedding coefficients are trainable
+    data['is_norm_coef_trainable'] = merge_layernorms  # New variable to indicate if layer normalization coefficients are trainable
 
     with open(config_path, 'w') as file:
         json.dump(data, file, indent=2)
@@ -103,7 +107,7 @@ def merge_models(base_model_id,
         use_in_merging=merge_embedding_layers  # Pass use_in_merging to the class
     ).to(device)
 
-    for i, module in enumerate(tqdm(modules, desc="Merging embedding layers")):
+    for i, module in enumerate(tqdm(modules, desc="Processing embedding layers")):
         dam_embedding_layer.embeddings[i].data = module.weight.data  # Corrected assignment
 
     assign = Assign(embedding_module[0], dam_embedding_layer)
@@ -113,7 +117,7 @@ def merge_models(base_model_id,
     linear_modules = find_linear_layers(merged_model)
 
     # Step 2: Loop through each linear layer found in the base model.
-    for m in tqdm(linear_modules, desc="Merging linear layers"):
+    for m in tqdm(linear_modules, desc="Processing linear layers"):
 
         # Step 3: For the current layer, gather the corresponding linear layers from each model that is being merged.
         modules = [glom(model, m) for model in models]
@@ -158,9 +162,17 @@ def merge_models(base_model_id,
         total_params = sum(p.numel() for p in model.parameters())
         return total_params
 
-    # Call the function and print the number of parameters
+    # Function to count the number of trainable parameters
+    def count_trainable_parameters(model):
+        return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    # Call the functions and print the number of parameters
     num_params = count_parameters(merged_model)
+    num_trainable_params = count_trainable_parameters(merged_model)
     print(f"Total number of parameters: {num_params}")
+    print(f"Total number of trainable parameters: {num_trainable_params}")
+
+    exit()
 
     print(f"Saving merged model to {output_path}")
     merged_model.save_pretrained(output_path)
@@ -169,17 +181,17 @@ def merge_models(base_model_id,
     fixed_config_path = fix_config(output_path, num_models=len(models), non_linearity=non_linearity, merge_embedding_layers=merge_embedding_layers, merge_layernorms=merge_layernorms, uses_base_model=use_base_model)
 
     # push to the hub
-    tokenizer.push_to_hub(repo_id)
-    merged_model.push_to_hub(repo_id)
+    # tokenizer.push_to_hub(repo_id)
+    # merged_model.push_to_hub(repo_id)
 
-    # Upload the fixed config file to the hub
-    api = HfApi()
-    api.upload_file(
-        path_or_fileobj=fixed_config_path,
-        path_in_repo="config.json",
-        repo_id=repo_id,
-        repo_type="model",
-    )
+    # # Upload the fixed config file to the hub
+    # api = HfApi()
+    # api.upload_file(
+    #     path_or_fileobj=fixed_config_path,
+    #     path_in_repo="config.json",
+    #     repo_id=repo_id,
+    #     repo_type="model",
+    # )
 
     print(f"Merge complete. Merged model saved to {output_path}")
 
@@ -215,13 +227,7 @@ def main():
                )
 
 if __name__ == "__main__":
-    # os.environ['HF_TOKEN'] = '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'
-    # os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
-    # os.environ['HF_HOME'] = '/workspace/hf-cache'
-
-    # Model and dataset details
-    # cache_dir = "/workspace/hf-cache"
     main()
 
 
-# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path ./merged_model --merge_embedding_layers --use_base_model --non_linearity tanh --merge_layernorms --repo_id arcee-train/pplist-merged-untrained-with-base-layernorm-embedding --em_merge_random --linear_merge_random --norm_merge_random
+#python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path ./merged_model  --use_base_model --non_linearity None --repo_id arcee-train/shamane-latest-untrained-merge
