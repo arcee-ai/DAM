@@ -9,6 +9,8 @@ from glom import glom, Assign
 from tqdm import tqdm
 from huggingface_hub import HfApi
 
+os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
+
 def fix_config(save_path, num_models, non_linearity, merge_embedding_layers, merge_layernorms, uses_base_model):
 
     config_path = os.path.join(save_path, 'config.json')
@@ -24,9 +26,11 @@ def fix_config(save_path, num_models, non_linearity, merge_embedding_layers, mer
 
     data['num_merged_models'] = num_models
     data['non_linearity'] = non_linearity
-    data['dam_embedding_layer'] = merge_embedding_layers
-    data['dam_layernorms'] = merge_layernorms
+    data['dam_embedding_layer'] = True  # Set to True as per instruction
+    data['dam_layernorms'] = True  # Set to True as per instruction
     data['uses_base_model'] = uses_base_model
+    data['is_embedding_coef_trainable'] = merge_embedding_layers  # New variable to indicate if embedding coefficients are trainable
+    data['is_norm_coef_trainable'] = merge_layernorms  # New variable to indicate if layer normalization coefficients are trainable
 
     with open(config_path, 'w') as file:
         json.dump(data, file, indent=2)
@@ -59,61 +63,61 @@ def merge_models(base_model_id,
 
     tokenizer = AutoTokenizer.from_pretrained(base_model_id, use_fast=True)
 
-    if merge_layernorms:
-        norm_modules = find_norm_layers(merged_model)
+    norm_modules = find_norm_layers(merged_model)
 
-        # Step 1: Identify all the norm layers in the merged model that need to be processed.
-        for m in tqdm(norm_modules, desc="Merging layer norms"):
+    # Step 1: Identify all the norm layers in the merged model that need to be processed.
+    for m in tqdm(norm_modules, desc="Processing layer norms"):
 
-            # Step 2: For the current layer, gather the corresponding norm layers from each model that is being merged.
-            modules = [glom(model, m) for model in models]
+        # Step 2: For the current layer, gather the corresponding norm layers from each model that is being merged.
+        modules = [glom(model, m) for model in models]
 
-            # Step 3: Create a new DAMRMSNorm that will be used to combine the weights from the models.
-            dam_layernorm = DAMRMSNorm(
-                normalized_shape=modules[0].weight.shape[0],
-                num_models=len(models),
-                eps=modules[0].variance_epsilon,
-                dtype=modules[0].weight.dtype,
-                non_linearity=non_linearity,  # Set non_linearity based on user input
-                use_random_init=norm_merge_random  # Pass random_init based on argument
-            ).to(device)
-
-            # Loop over each module (i.e., norm layer) from the models being merged
-            for i, module in enumerate(modules):
-                # Assign the weights from the current model's layer to the corresponding slot in DAMLayerNorm
-                dam_layernorm.weights[i].data = module.weight.data
-                
-            # Create an assignment operation to replace the original norm layer with the merged DAMLayerNorm
-            assign = Assign(m, dam_layernorm)
-            
-            # Apply the assignment to the merged model, effectively inserting the merged DAMLayerNorm in place of the original layer
-            glom(merged_model, assign)
-
-    if merge_embedding_layers:
-        embedding_module = find_embedding_layers(merged_model)
-
-        modules = [glom(model, embedding_module[0]) for model in models]
-
-        dam_embedding_layer = DAMEmbeddingLayer(
-            num_embeddings=modules[0].num_embeddings,
-            embedding_dim=modules[0].embedding_dim,
+        # Step 3: Create a new DAMRMSNorm that will be used to combine the weights from the models.
+        dam_layernorm = DAMRMSNorm(
+            normalized_shape=modules[0].weight.shape[0],
             num_models=len(models),
+            eps=modules[0].variance_epsilon,
             dtype=modules[0].weight.dtype,
             non_linearity=non_linearity,  # Set non_linearity based on user input
-            use_random_init=embedding_merge_random  # Pass random_init based on argument
+            use_random_init=norm_merge_random,  # Pass random_init based on argument
+            use_in_merging=merge_layernorms  # Pass use_in_merging to the class
         ).to(device)
 
-        for i, module in enumerate(tqdm(modules, desc="Merging embedding layers")):
-            dam_embedding_layer.embeddings[i].data = module.weight.data  # Corrected assignment
-
-        assign = Assign(embedding_module[0], dam_embedding_layer)
+        # Loop over each module (i.e., norm layer) from the models being merged
+        for i, module in enumerate(modules):
+            # Assign the weights from the current model's layer to the corresponding slot in DAMLayerNorm
+            dam_layernorm.weights[i].data = module.weight.data
+                
+        # Create an assignment operation to replace the original norm layer with the merged DAMRMSNorm
+        assign = Assign(m, dam_layernorm)
+        
+        # Apply the assignment to the merged model, effectively inserting the merged DAMRMSNorm in place of the original layer
         glom(merged_model, assign)
+
+    embedding_module = find_embedding_layers(merged_model)
+
+    modules = [glom(model, embedding_module[0]) for model in models]
+
+    dam_embedding_layer = DAMEmbeddingLayer(
+        num_embeddings=modules[0].num_embeddings,
+        embedding_dim=modules[0].embedding_dim,
+        num_models=len(models),
+        dtype=modules[0].weight.dtype,
+        non_linearity=non_linearity,  # Set non_linearity based on user input
+        use_random_init=embedding_merge_random,  # Pass random_init based on argument
+        use_in_merging=merge_embedding_layers  # Pass use_in_merging to the class
+    ).to(device)
+
+    for i, module in enumerate(tqdm(modules, desc="Processing embedding layers")):
+        dam_embedding_layer.embeddings[i].data = module.weight.data  # Corrected assignment
+
+    assign = Assign(embedding_module[0], dam_embedding_layer)
+    glom(merged_model, assign)
 
     # Step 1: Identify all the linear layers in the merged model that need to be processed.
     linear_modules = find_linear_layers(merged_model)
 
     # Step 2: Loop through each linear layer found in the base model.
-    for m in tqdm(linear_modules, desc="Merging linear layers"):
+    for m in tqdm(linear_modules, desc="Processing linear layers"):
 
         # Step 3: For the current layer, gather the corresponding linear layers from each model that is being merged.
         modules = [glom(model, m) for model in models]
@@ -133,7 +137,8 @@ def merge_models(base_model_id,
             bias=modules[0].bias is not None,
             dtype=modules[0].weight.dtype,
             non_linearity=non_linearity,  # Set non_linearity based on user input
-            use_random_init=linear_merge_random  # Pass random_init based on argument
+            use_random_init=linear_merge_random,  # Pass random_init based on argument
+            use_in_merging=True  # Always set use_in_merging to True for linear layers
         ).to(device)
 
 
@@ -157,9 +162,17 @@ def merge_models(base_model_id,
         total_params = sum(p.numel() for p in model.parameters())
         return total_params
 
-    # Call the function and print the number of parameters
+    # Function to count the number of trainable parameters
+    def count_trainable_parameters(model):
+        return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    # Call the functions and print the number of parameters
     num_params = count_parameters(merged_model)
+    num_trainable_params = count_trainable_parameters(merged_model)
     print(f"Total number of parameters: {num_params}")
+    print(f"Total number of trainable parameters: {num_trainable_params}")
+
+    exit()
 
     print(f"Saving merged model to {output_path}")
     merged_model.save_pretrained(output_path)
@@ -168,17 +181,17 @@ def merge_models(base_model_id,
     fixed_config_path = fix_config(output_path, num_models=len(models), non_linearity=non_linearity, merge_embedding_layers=merge_embedding_layers, merge_layernorms=merge_layernorms, uses_base_model=use_base_model)
 
     # push to the hub
-    tokenizer.push_to_hub(repo_id)
-    merged_model.push_to_hub(repo_id)
+    # tokenizer.push_to_hub(repo_id)
+    # merged_model.push_to_hub(repo_id)
 
-    # Upload the fixed config file to the hub
-    api = HfApi()
-    api.upload_file(
-        path_or_fileobj=fixed_config_path,
-        path_in_repo="config.json",
-        repo_id=repo_id,
-        repo_type="model",
-    )
+    # # Upload the fixed config file to the hub
+    # api = HfApi()
+    # api.upload_file(
+    #     path_or_fileobj=fixed_config_path,
+    #     path_in_repo="config.json",
+    #     repo_id=repo_id,
+    #     repo_type="model",
+    # )
 
     print(f"Merge complete. Merged model saved to {output_path}")
 
@@ -214,13 +227,7 @@ def main():
                )
 
 if __name__ == "__main__":
-    # os.environ['HF_TOKEN'] = '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'
-    # os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
-    # os.environ['HF_HOME'] = '/workspace/hf-cache'
-
-    # Model and dataset details
-    # cache_dir = "/workspace/hf-cache"
     main()
 
 
-# python merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1  WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cpu --output_path ./merged_model --merge_embedding_layers --use_base_model --non_linearity tanh --merge_layernorms --repo_id arcee-train/pplist-merged-untrained-with-base-layernorm-embedding --em_merge_random --linear_merge_random --norm_merge_random
+#python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path ./merged_model  --use_base_model --non_linearity None --repo_id arcee-train/shamane-latest-untrained-merge

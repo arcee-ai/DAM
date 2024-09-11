@@ -17,7 +17,7 @@ In this step, we assign a trainable coefficient for each column of each model's 
 
 
 ```bash
-python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path ./merged_model --merge_embedding_layers --merge_layernorms --use_base_model --non_linearity "None" --embedding_merge_random --linear_merge_random --repo_id arcee-train/untrained-merged-random-coeffs
+python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path ./merged_model  --use_base_model --non_linearity None --repo_id arcee-train/shamane-latest-untrained-merge
 ```
 
 #### Arguments:

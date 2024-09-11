@@ -48,7 +48,8 @@ def prepare_model(model_name, cache_dir):
     print(f"Loading model from {model_name} with cache dir {cache_dir}")
     merged_model = MergedMistralForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, device_map="auto", cache_dir=cache_dir)
     print_trainable_parameters(merged_model)
-    freeze_except_mergers(merged_model)
+    # We do not need this anymore since we freeze the params during the merging.
+    #freeze_except_mergers(merged_model)
     print("####################################")
     print_trainable_parameters(merged_model)
     
