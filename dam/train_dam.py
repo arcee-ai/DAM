@@ -30,6 +30,7 @@ loss_fns = {
 @click.option("--weight_decay", default=0.0, help="Weight decay for the optimizer.")
 @click.option("--learning_rate", default=1e-3, help="Learning rate for the optimizer.")
 @click.option("--lr_scheduler_type", default="linear", help="Type of learning rate scheduler (`linear`, etc.).")
+@click.option("--warmup_ratio", default=0.1, help="Warmup ratio for learning rate scheduler.")
 @click.option("--lambda_coef_similarity", default=0.01, help="Lambda coefficient for similarity regularization.")
 @click.option("--lambda_coef_l1", default=1e-6, help="L1 regularization coefficient.")
 @click.option("--lambda_coef_l2", default=1e-5, help="L2 regularization coefficient.")
@@ -41,7 +42,7 @@ loss_fns = {
 @click.option("--cache_dir", default="/home/ec2-user/.cache/huggingface", help="Directory to cache the models.")
 @click.option("--base_model_name", default="mistralai/Mistral-7B-v0.1", help="Name of the base model.")
 def main(temperature, weight_decay, learning_rate, 
-         lr_scheduler_type, lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2,
+         lr_scheduler_type, warmup_ratio, lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2,
          use_wandb, generate_logits_on_fly, use_all_logits,
          untrained_merged_model_name, combined_hf_dataset_dir, cache_dir, base_model_name):
     # Model and dataset details
@@ -69,6 +70,7 @@ def main(temperature, weight_decay, learning_rate,
         # max_steps=10,
         weight_decay=weight_decay,
         lr_scheduler_type=lr_scheduler_type,
+        warmup_ratio=warmup_ratio,
         bf16=True,
         push_to_hub=False,
         remove_unused_columns=False,
@@ -120,4 +122,4 @@ def main(temperature, weight_decay, learning_rate,
 if __name__ == "__main__":
     main()
 
-# python dam/train_dam.py --temperature 2.0 --weight_decay 0.0 --learning_rate 1e-2 --lr_scheduler_type linear --lambda_coef_similarity 0.01 --lambda_coef_l1 0.0 --lambda_coef_l2 0.0 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name /home/ec2-user/shamane/DAM/merged_model  --combined_hf_dataset_dir arcee-train/my-combined-dataset --cache_dir /home/ec2-user/.cache/huggingface --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True
+# python dam/train_dam.py --temperature 2.0 --weight_decay 0.0 --learning_rate 1e-2 --lr_scheduler_type linear --warmup_ratio 0.1 --lambda_coef_similarity 0.01 --lambda_coef_l1 0.0 --lambda_coef_l2 0.0 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name /home/ec2-user/shamane/DAM/merged_model  --combined_hf_dataset_dir arcee-train/my-combined-dataset --cache_dir /home/ec2-user/.cache/huggingface --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True

@@ -85,7 +85,7 @@ def compute_and_save_topk_logits(models_dict, tokenized_dataset, device, batch_s
 @click.option("--cache_dir", type=str, default="/home/ec2-user/.cache/huggingface", help="Cache directory.")
 @click.option("--compute_logits", type=bool, default=True, help="Whether to compute logits or just keep input_ids.")
 @click.option("--dataset_id", type=str, default="arcee-train/my-combined-dataset", help="Dataset ID to push to Hugging Face Hub.")
-@click.option("--base_model_dataset_name", type=str, default="reflex-ai/fineweb-ultra-mini", help="Sample dataset name related to the base model.")
+@click.option("--base_model_dataset_name", type=str, default=None, help="Sample dataset name related to the base model.")
 @click.option("--example_count", type=int, default=1729, help="Number of examples to select from each dataset.")
 @click.option("--max_length", type=int, default=2048, help="Controls the length of the tokenized examples that will be used to train.")
 @click.option("--add_top_k_logits", type=bool, default=False, help="Whether to add top-K logits to the combined dataset.")
@@ -108,7 +108,7 @@ def main(k, dataset_names, model_ids, base_model_name, cache_dir, compute_logits
                                                 model_name=base_model_name, 
                                                 cache_dir=cache_dir, 
                                                 max_length=max_length,
-                                                base_model_dataset_name=base_model_dataset_name)
+                                                base_model_dataset_name=base_model_dataset_name if base_model_dataset_name else None)
 
     # Compute logits for each model and input set and save as additional columns if add_top_k_logits is True
     if add_top_k_logits:
