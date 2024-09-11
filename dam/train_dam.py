@@ -14,15 +14,7 @@ from pathlib import Path
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 
 # Manual configurations
-loss_fns = {
-    "similarity": True, # default is True
-    "l1_l2_reg": True, # default is True
-    "overlap": False,   # default is False - proposed alternative to similarity
-    "kl":True, # default is True
-    "mse":False, # default is False - proposed alternative to kl
-    "entropy":False # default is False - proposed alternative to kl
-    }
-
+from custom_trainer.loss_configs import loss_configs
 
 # Command line arguments allow for WandB Sweep
 @click.command()
@@ -39,12 +31,13 @@ loss_fns = {
 @click.option("--use_all_logits", default=True, help="Use all logits during training.")
 @click.option("--untrained_merged_model_name", default="arcee-train/pplist-merged-untrained-with-base-layernorm-embedding", help="Name of the untrained merged model.")
 @click.option("--combined_hf_dataset_dir", default="arcee-train/logits-dataset-full-set-top-50", help="Directory of the dataset with logits.")
-@click.option("--cache_dir", default="/home/ec2-user/.cache/huggingface", help="Directory to cache the models.")
+@click.option("--cache_dir", default="/workspace/hf-cache", help="Directory to cache the models.")
 @click.option("--base_model_name", default="mistralai/Mistral-7B-v0.1", help="Name of the base model.")
+@click.option("--loss_config", default="default", help="Loss function configuration.")
 def main(temperature, weight_decay, learning_rate, 
          lr_scheduler_type, warmup_ratio, lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2,
          use_wandb, generate_logits_on_fly, use_all_logits,
-         untrained_merged_model_name, combined_hf_dataset_dir, cache_dir, base_model_name):
+         untrained_merged_model_name, combined_hf_dataset_dir, cache_dir, base_model_name, loss_config):
     # Model and dataset details
     
     # Setup tokenizer
@@ -57,6 +50,9 @@ def main(temperature, weight_decay, learning_rate,
     # Prepare the model
     model = prepare_model(untrained_merged_model_name, cache_dir=cache_dir)
 
+    # Loss functions
+    loss_fns = loss_configs[loss_config]
+
     # Training arguments
     training_args = TrainingArguments(
         output_dir="./results",
@@ -64,7 +60,7 @@ def main(temperature, weight_decay, learning_rate,
         save_strategy="no",
         do_eval=False,
         learning_rate=learning_rate,
-        per_device_train_batch_size=4,
+        per_device_train_batch_size=2,
         per_device_eval_batch_size=1,
         num_train_epochs=3,
         # max_steps=10,
@@ -101,7 +97,7 @@ def main(temperature, weight_decay, learning_rate,
     )
 
     if use_wandb:
-        wandb.init(entity = 'arcee-ai', project="Dynamic Adaptive Merging")
+        wandb.init(entity = 'arcee-ai', project="DAM: Final")
         wandb.config.update(loss_fns)
 
     # Train the model
@@ -122,4 +118,4 @@ def main(temperature, weight_decay, learning_rate,
 if __name__ == "__main__":
     main()
 
-# python dam/train_dam.py --temperature 2.0 --weight_decay 0.0 --learning_rate 1e-2 --lr_scheduler_type linear --warmup_ratio 0.1 --lambda_coef_similarity 0.01 --lambda_coef_l1 0.0 --lambda_coef_l2 0.0 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name /home/ec2-user/shamane/DAM/merged_model  --combined_hf_dataset_dir arcee-train/my-combined-dataset --cache_dir /home/ec2-user/.cache/huggingface --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True
+# python dam/train_dam.py --temperature 2.0 --weight_decay 0.0 --learning_rate 1e-2 --lr_scheduler_type linear --warmup_ratio 0.1 --lambda_coef_similarity 0.01 --lambda_coef_l1 0.0 --lambda_coef_l2 0.0 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name /home/ec2-user/shamane/DAM/merged_model  --combined_hf_dataset_dir arcee-train/my-combined-dataset --cache_dir /workspace/hf-cache --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True
