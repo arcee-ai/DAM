@@ -51,7 +51,7 @@ def entropy_loss(logits, attention_mask, non_padded_tokens, temperature=1.0):
 
 def mse_loss(logits, target_logits, non_padded_tokens, lambda_coef_mse=0.001):
     # Compute the MSE loss
-    mse_loss = F.mse_loss(logits, target_logits, reduction='sum')
+    mse_loss = F.mse_loss(logits, target_logits, reduction='none').mean(dim=-1).sum()
     
     # Normalize by the number of non-padded tokens
     return lambda_coef_mse * mse_loss / non_padded_tokens
@@ -59,10 +59,10 @@ def mse_loss(logits, target_logits, non_padded_tokens, lambda_coef_mse=0.001):
 class DAMTrainer(Trainer):
     def __init__(self, model, 
                  lambda_coef_similarity=0.01,  # Added similarity regularization coefficient
-                 lambda_coef_l1=None,  # Added L1 regularization coefficient
-                 lambda_coef_l2=0.01,  # Added L2 regularization coefficient
-                 lambda_coef_overlap=0.000001,  # Added overlap regularization coefficient
-                 lambda_coef_mse=0.001,  # Added MSE regularization coefficient
+                 lambda_coef_l1=0,  # Added L1 regularization coefficient
+                 lambda_coef_l2=0,  # Added L2 regularization coefficient
+                 lambda_coef_overlap=0,  # Added overlap regularization coefficient
+                 lambda_coef_mse=1.0,  # Added MSE regularization coefficient
                  temperature=2.0, 
                  loss_fns=None,
                  base_model_path=None, 

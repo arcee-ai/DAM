@@ -16,7 +16,7 @@ os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 # Manual configurations
 loss_fns = {
     "similarity": True, # default is True
-    "l1_l2_reg": True, # default is True
+    "l1_l2_reg": False, # default is True
     "overlap": False,   # default is False - proposed alternative to similarity
     "kl":True, # default is True
     "mse":False, # default is False - proposed alternative to kl

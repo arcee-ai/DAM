@@ -17,7 +17,7 @@ In this step, we assign a trainable coefficient for each column of each model's 
 
 
 ```bash
-python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path ./merged_model  --use_base_model --repo_id arcee-train/shamane-latest-untrained-merge --use_base_model
+python dam/merge.py mistralai/Mistral-7B-v0.1 augmxnt/shisa-gamma-7b-v1 WizardLM/WizardMath-7B-V1.1 arcee-train/Abel-7B-002-truncated-embeds --device cuda --output_path ./merged_model  --use_base_model --repo_id arcee-train/shamane-9-12-untrained-merge --use_base_model
 ```
 
 #### Arguments:
@@ -35,7 +35,7 @@ To prepare the dataset, navigate to the `dam/data` folder and run `create_merge_
 #### Command:
 
 ```bash
-python dam/data/create_merge_dataset.py  --dataset_names "p1atdev/ichikara-instruction:20231115-1,microsoft/orca-math-word-problems-200k,meta-math/MetaMathQA" --base_model_dataset_name "reflex-ai/fineweb-ultra-mini"  --model_ids "augmxnt/shisa-gamma-7b-v1,WizardLM/WizardMath-7B-V1.1,arcee-train/Abel-7B-002-truncated-embeds" --base_model_name mistralai/Mistral-7B-v0.1 --cache_dir /home/ec2-user/.cache/huggingface --compute_logits True --dataset_id arcee-train/my-combined-dataset --base_model_dataset_name reflex-ai/fineweb-ultra-mini --example_count 1729 --max_length 2048 --add_top_k_logits  False
+python dam/data/create_merge_dataset.py  --dataset_names "p1atdev/ichikara-instruction:20231115-1,microsoft/orca-math-word-problems-200k,meta-math/MetaMathQA" --base_model_dataset_name "reflex-ai/fineweb-ultra-mini"  --model_ids "augmxnt/shisa-gamma-7b-v1,WizardLM/WizardMath-7B-V1.1,arcee-train/Abel-7B-002-truncated-embeds" --base_model_name mistralai/Mistral-7B-v0.1 --cache_dir /home/ec2-user/.cache/huggingface --compute_logits True --dataset_id arcee-train/9-2-combined-dataset --base_model_dataset_name reflex-ai/fineweb-ultra-mini --example_count 1729 --max_length 2048 --add_top_k_logits  False
 ```
 
 #### Arguments:
@@ -61,7 +61,7 @@ Manual configurations are available at the top of the train_dam.py script.
 
 
 ```bash
-python dam/train_dam.py --temperature 2.0 --weight_decay 0.0 --learning_rate 1e-4 --lr_scheduler_type cosine --lambda_coef_similarity 0.01 --lambda_coef_l1 0.0 --lambda_coef_l2 0.0 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name arcee-train/merged-untrained --combined_hf_dataset_dir arcee-train/my-combined-dataset --cache_dir /home/ec2-user/.cache/huggingface --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True --warmup_ratio 0.1
+python dam/train_dam.py --learning_rate 1e-3 --lr_scheduler_type cosine --lambda_coef_similarity 0.01 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name /home/ec2-user/shamane/DAM/merged_model --combined_hf_dataset_dir arcee-train/9-2-combined-dataset --cache_dir /home/ec2-user/.cache/huggingface --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True --warmup_ratio 0.1
 
 ```
 
