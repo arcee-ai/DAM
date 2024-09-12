@@ -26,16 +26,16 @@ loss_fns = {
 
 # Command line arguments allow for WandB Sweep
 @click.command()
-@click.option("--temperature", default=1.5, help="Temperature for KL divergence.")
+@click.option("--temperature", default=2.0, help="Temperature for KL divergence.")
 @click.option("--weight_decay", default=0.0, help="Weight decay for the optimizer.")
 @click.option("--learning_rate", default=1e-3, help="Learning rate for the optimizer.")
-@click.option("--lr_scheduler_type", default="linear", help="Type of learning rate scheduler (`linear`, etc.).")
-@click.option("--warmup_ratio", default=0.1, help="Warmup ratio for learning rate scheduler.")
+@click.option("--lr_scheduler_type", default="constant", help="Type of learning rate scheduler (`linear`, etc.).")
+@click.option("--warmup_ratio", default=0.0, help="Warmup ratio for learning rate scheduler.")
 @click.option("--lambda_coef_similarity", default=0.01, help="Lambda coefficient for similarity regularization.")
-@click.option("--lambda_coef_l1", default=1e-6, help="L1 regularization coefficient.")
-@click.option("--lambda_coef_l2", default=1e-5, help="L2 regularization coefficient.")
-@click.option("--per_device_train_batch_size", default=4, help="Per device train batch size.")
-@click.option("--gradient_accumulation_steps", default=8, help="Number of gradient accumulation steps.")
+@click.option("--lambda_coef_l1", default=0.0, help="L1 regularization coefficient.")
+@click.option("--lambda_coef_l2", default=0.0, help="L2 regularization coefficient.")
+@click.option("--per_device_train_batch_size", default=1, help="Per device train batch size.")
+@click.option("--gradient_accumulation_steps", default=1, help="Number of gradient accumulation steps.")
 @click.option("--use_wandb", default=True, help="Upload training logs to Weights and Biases.")
 @click.option("--generate_logits_on_fly", default=True, help="Generate logits on-the-fly during training.")
 @click.option("--use_all_logits", default=True, help="Use all logits during training.")
@@ -68,7 +68,7 @@ def main(temperature, weight_decay, learning_rate,
         learning_rate=learning_rate,
         per_device_train_batch_size=per_device_train_batch_size,
         per_device_eval_batch_size=1,
-        num_train_epochs=3,
+        num_train_epochs=1,
         # max_steps=10,
         weight_decay=weight_decay,
         lr_scheduler_type=lr_scheduler_type,
