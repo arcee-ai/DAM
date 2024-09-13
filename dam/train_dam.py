@@ -9,6 +9,7 @@ from modeling.dam import DAMBaseLayer
 import click
 import wandb
 from pathlib import Path
+from optimizer import MoFOAdamW
 
 # Environment variables
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
@@ -31,6 +32,7 @@ loss_fns = {
 @click.option("--learning_rate", default=1e-3, help="Learning rate for the optimizer.")
 @click.option("--lr_scheduler_type", default="constant", help="Type of learning rate scheduler (`linear`, etc.).")
 @click.option("--warmup_ratio", default=0.0, help="Warmup ratio for learning rate scheduler.")
+@click.option("--mofo_alpha", default=0.3, help="The alpha parameter for the MoFO optimizer (fraction of gradients kept based on momentum)")
 @click.option("--lambda_coef_similarity", default=0.01, help="Lambda coefficient for similarity regularization.")
 @click.option("--lambda_coef_l1", default=0.0, help="L1 regularization coefficient.")
 @click.option("--lambda_coef_l2", default=0.0, help="L2 regularization coefficient.")
@@ -44,7 +46,7 @@ loss_fns = {
 @click.option("--cache_dir", default="/home/ec2-user/.cache/huggingface", help="Directory to cache the models.")
 @click.option("--base_model_name", default="mistralai/Mistral-7B-v0.1", help="Name of the base model.")
 def main(temperature, weight_decay, learning_rate, 
-         lr_scheduler_type, warmup_ratio, lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2,
+         lr_scheduler_type, warmup_ratio, mofo_alpha, lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2,
          per_device_train_batch_size, gradient_accumulation_steps, use_wandb, generate_logits_on_fly, use_all_logits,
          untrained_merged_model_name, combined_hf_dataset_dir, cache_dir, base_model_name):
     # Model and dataset details
@@ -84,6 +86,8 @@ def main(temperature, weight_decay, learning_rate,
         max_grad_norm=1.0,
     )
 
+    optimizer = MoFOAdamW(model.parameters(), lr=learning_rate, alpha=mofo_alpha)
+
     # Initialize DAMTrainer
     trainer = DAMTrainer(
         model=model,  # Pass the main model here
@@ -100,6 +104,7 @@ def main(temperature, weight_decay, learning_rate,
         generate_logits_on_fly=generate_logits_on_fly,
         use_all_logits=use_all_logits,
         use_wandb=use_wandb,
+        optimizers=(optimizer, None)
     )
 
     if use_wandb:
