@@ -15,5 +15,5 @@ loss_configs["mse_sim"] = default.copy().update({"kl": False,
                                                  "mse": True}) # Alternative to KL
 loss_configs["entropy_sim"] = default.copy().update({"kl": False, 
                                                      "entropy": True})  
-loss_configs["overlap"] = default.copy().update({"similarity": False,
+loss_configs["kl_overlap"] = default.copy().update({"similarity": False,
                                                 "overlap": True}) # Alternative to similarity
