@@ -3,7 +3,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from datasets import load_from_disk, load_dataset
 from model_preparation import prepare_model
-from custom_trainer.dam_trainer import DAMTrainer  # Custom DAMTrainer
+from custom_trainer.dam_trainer import DAMTrainer
 from transformers import TrainingArguments, default_data_collator
 from modeling.dam import DAMBaseLayer
 import click
@@ -14,52 +14,49 @@ from optimizer import MoFOAdamW
 # Environment variables
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 
-# Manual configurations
-loss_fns = {
-    "similarity": True, # default is True
-    "l1_l2_reg": False, # default is True
-    "overlap": False,   # default is False - proposed alternative to similarity
-    "kl":True, # default is True
-    "mse":False, # default is False - proposed alternative to kl
-    "entropy":False # default is False - proposed alternative to kl
-    }
-
-
-# Command line arguments allow for WandB Sweep
+# Command line arguments
 @click.command()
 @click.option("--temperature", default=2.0, help="Temperature for KL divergence.")
 @click.option("--weight_decay", default=0.0, help="Weight decay for the optimizer.")
 @click.option("--learning_rate", default=1e-3, help="Learning rate for the optimizer.")
 @click.option("--lr_scheduler_type", default="constant", help="Type of learning rate scheduler (`linear`, etc.).")
 @click.option("--warmup_ratio", default=0.0, help="Warmup ratio for learning rate scheduler.")
-@click.option("--mofo_alpha", default=0.3, help="The alpha parameter for the MoFO optimizer (fraction of gradients kept based on momentum)")
+@click.option("--mofo_alpha", default=0.3, help="The alpha parameter for the MoFO optimizer (fraction of gradients kept based on momentum). Set to None to use AdamW")
 @click.option("--lambda_coef_similarity", default=0.01, help="Lambda coefficient for similarity regularization.")
 @click.option("--lambda_coef_l1", default=0.0, help="L1 regularization coefficient.")
 @click.option("--lambda_coef_l2", default=0.0, help="L2 regularization coefficient.")
 @click.option("--per_device_train_batch_size", default=1, help="Per device train batch size.")
 @click.option("--gradient_accumulation_steps", default=1, help="Number of gradient accumulation steps.")
-@click.option("--use_wandb", default=True, help="Upload training logs to Weights and Biases.")
-@click.option("--generate_logits_on_fly", default=True, help="Generate logits on-the-fly during training.")
-@click.option("--use_all_logits", default=True, help="Use all logits during training.")
-@click.option("--untrained_merged_model_name", default="arcee-train/pplist-merged-untrained-with-base-layernorm-embedding", help="Name of the untrained merged model.")
-@click.option("--combined_hf_dataset_dir", default="arcee-train/logits-dataset-full-set-top-50", help="Directory of the dataset with logits.")
+@click.option("--use_wandb", type=click.BOOL, default=True, help="Upload training logs to Weights and Biases.")
+@click.option("--generate_logits_on_fly", type=click.BOOL, default=True, help="Generate logits on-the-fly during training.")
+@click.option("--use_all_logits", type=click.BOOL, default=True, help="Use all logits during training.")
+@click.option("--untrained_merged_model_name", default="arcee-train/pplist-merged-untrained-linear-only-no-base", help="Name of the untrained merged model.")
+@click.option("--combined_hf_dataset_dir", default="arcee-train/DAM_combined_no_base_no_logits", help="Directory of the dataset with logits.")
 @click.option("--cache_dir", default="/home/ec2-user/.cache/huggingface", help="Directory to cache the models.")
 @click.option("--base_model_name", default="mistralai/Mistral-7B-v0.1", help="Name of the base model.")
+@click.option("--similarity", type=click.BOOL, default=True, help="Use similarity loss.")
+@click.option("--l1_l2_reg", type=click.BOOL, default=False, help="Use L1/L2 regularization.")
+@click.option("--overlap", type=click.BOOL, default=False, help="Use overlap loss.")
+@click.option("--kl", type=click.BOOL, default=True, help="Use KL divergence loss.")
+@click.option("--mse", type=click.BOOL, default=False, help="Use MSE loss.")
+@click.option("--entropy", type=click.BOOL, default=False, help="Use entropy loss.")
 def main(temperature, weight_decay, learning_rate, 
          lr_scheduler_type, warmup_ratio, mofo_alpha, lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2,
          per_device_train_batch_size, gradient_accumulation_steps, use_wandb, generate_logits_on_fly, use_all_logits,
-         untrained_merged_model_name, combined_hf_dataset_dir, cache_dir, base_model_name):
+         untrained_merged_model_name, combined_hf_dataset_dir, cache_dir, base_model_name,
+         similarity, l1_l2_reg, overlap, kl, mse, entropy):
+    cmd_args = locals().copy()
+
     # Model and dataset details
+    # Prepare the model
+    model = prepare_model(untrained_merged_model_name, cache_dir=cache_dir)
     
     # Setup tokenizer
     tokenizer = AutoTokenizer.from_pretrained(untrained_merged_model_name, use_fast=True, cache_dir=cache_dir)
 
-    # Load the dataset from disk
+    # Load the dataset
     # dataset = load_from_disk(combined_hf_dataset_dir)
     dataset = load_dataset(combined_hf_dataset_dir, split="train")
-
-    # Prepare the model
-    model = prepare_model(untrained_merged_model_name, cache_dir=cache_dir)
 
     # Training arguments
     training_args = TrainingArguments(
@@ -71,7 +68,6 @@ def main(temperature, weight_decay, learning_rate,
         per_device_train_batch_size=per_device_train_batch_size,
         per_device_eval_batch_size=1,
         num_train_epochs=1,
-        # max_steps=10,
         weight_decay=weight_decay,
         lr_scheduler_type=lr_scheduler_type,
         warmup_ratio=warmup_ratio,
@@ -86,8 +82,16 @@ def main(temperature, weight_decay, learning_rate,
         max_grad_norm=1.0,
     )
 
-    optimizer = MoFOAdamW(model.parameters(), lr=learning_rate, alpha=mofo_alpha)
-
+    optimizer = MoFOAdamW(model.parameters(), lr=learning_rate, alpha=mofo_alpha) if mofo_alpha else None
+    loss_fns = {
+        "similarity": similarity, 
+        "l1_l2_reg": l1_l2_reg, 
+        "overlap": overlap,  
+        "kl": kl, 
+        "mse": mse, 
+        "entropy": entropy 
+        }
+    
     # Initialize DAMTrainer
     trainer = DAMTrainer(
         model=model,  # Pass the main model here
@@ -110,17 +114,29 @@ def main(temperature, weight_decay, learning_rate,
     if use_wandb:
         wandb.init(entity = 'arcee-ai', project="Dynamic Adaptive Merging")
         wandb.config.update(loss_fns)
+        # Get the keys from TrainingArguments to exclude them from cmd_args
+        training_args_keys = set(training_args.to_dict().keys())
+
+        # Create a dictionary of command-line arguments to log
+        cmd_args_to_log = {k: v for k, v in cmd_args.items() if k not in training_args_keys}
+        wandb.config.update(cmd_args_to_log)
+
 
     # Train the model
     trainer.train()
 
     # Save the trained model
-    save_path = Path("saved_models") / wandb.run.name if use_wandb else Path("results") / "model"
+    save_path = Path(__file__).parent / "saved_models"
+    if use_wandb:
+        save_path /= wandb.run.name
+    else:
+        save_path /= "model"
     save_path.mkdir(parents=True, exist_ok=True)
 
     trainer.save_model(save_path)
 
-    wandb.finish()
+    if use_wandb:
+        wandb.finish()
 
     torch.cuda.empty_cache()
     torch.cuda.reset_max_memory_allocated()
