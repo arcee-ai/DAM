@@ -25,6 +25,9 @@ os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 @click.option("--lambda_coef_similarity", default=0.01, help="Lambda coefficient for similarity regularization.")
 @click.option("--lambda_coef_l1", default=0.0, help="L1 regularization coefficient.")
 @click.option("--lambda_coef_l2", default=0.0, help="L2 regularization coefficient.")
+@click.option("--lambda_coef_entropy", default=0.01, help="Lambda coefficient for entropy loss.")
+@click.option("--lambda_coef_mse", default=0.01, help="Lambda coefficient for mse loss.")
+@click.option("--lambda_coef_overlap", default=0.01, help="Lambda coefficient for overlap loss.")
 @click.option("--per_device_train_batch_size", default=1, help="Per device train batch size.")
 @click.option("--gradient_accumulation_steps", default=1, help="Number of gradient accumulation steps.")
 @click.option("--use_wandb", type=click.BOOL, default=True, help="Upload training logs to Weights and Biases.")
@@ -32,7 +35,7 @@ os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 @click.option("--use_all_logits", type=click.BOOL, default=True, help="Use all logits during training.")
 @click.option("--untrained_merged_model_name", default="arcee-train/pplist-merged-untrained-linear-only-no-base", help="Name of the untrained merged model.")
 @click.option("--combined_hf_dataset_dir", default="arcee-train/DAM_combined_no_base_no_logits", help="Directory of the dataset with logits.")
-@click.option("--cache_dir", default="/home/ec2-user/.cache/huggingface", help="Directory to cache the models.")
+@click.option("--cache_dir", default="/workspace/hf-cache", help="Directory to cache the models.")
 @click.option("--base_model_name", default="mistralai/Mistral-7B-v0.1", help="Name of the base model.")
 @click.option("--similarity", type=click.BOOL, default=True, help="Use similarity loss.")
 @click.option("--l1_l2_reg", type=click.BOOL, default=False, help="Use L1/L2 regularization.")
@@ -41,7 +44,8 @@ os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 @click.option("--mse", type=click.BOOL, default=False, help="Use MSE loss.")
 @click.option("--entropy", type=click.BOOL, default=False, help="Use entropy loss.")
 def main(temperature, weight_decay, learning_rate, 
-         lr_scheduler_type, warmup_ratio, mofo_alpha, lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2,
+         lr_scheduler_type, warmup_ratio, mofo_alpha, 
+         lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2, lambda_coef_entropy, lambda_coef_mse, lambda_coef_overlap,
          per_device_train_batch_size, gradient_accumulation_steps, use_wandb, generate_logits_on_fly, use_all_logits,
          untrained_merged_model_name, combined_hf_dataset_dir, cache_dir, base_model_name,
          similarity, l1_l2_reg, overlap, kl, mse, entropy):
@@ -102,9 +106,12 @@ def main(temperature, weight_decay, learning_rate,
         lambda_coef_similarity=lambda_coef_similarity,  # Example lambda coefficient for regularization
         lambda_coef_l1=lambda_coef_l1,  # L1 regularization coefficient set to None
         lambda_coef_l2=lambda_coef_l2,  # L2 regularization coefficient
-        temperature=temperature,  # Example temperature for KL divergence
+        lambda_coef_entropy=lambda_coef_entropy,
+        lambda_coef_mse=lambda_coef_mse,
+        lambda_coef_overlap=lambda_coef_overlap,
+        temperature=temperature,
         loss_fns=loss_fns,
-        base_model_path=base_model_name,  # Pass base model as an argument
+        base_model_path=base_model_name, 
         generate_logits_on_fly=generate_logits_on_fly,
         use_all_logits=use_all_logits,
         use_wandb=use_wandb,
@@ -145,4 +152,4 @@ def main(temperature, weight_decay, learning_rate,
 if __name__ == "__main__":
     main()
 
-# python dam/train_dam.py --temperature 2.0 --weight_decay 0.0 --learning_rate 1e-2 --lr_scheduler_type linear --warmup_ratio 0.1 --lambda_coef_similarity 0.01 --lambda_coef_l1 0.0 --lambda_coef_l2 0.0 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name /home/ec2-user/shamane/DAM/merged_model  --combined_hf_dataset_dir arcee-train/my-combined-dataset --cache_dir /home/ec2-user/.cache/huggingface --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True
+# python dam/train_dam.py --temperature 2.0 --weight_decay 0.0 --learning_rate 1e-2 --lr_scheduler_type linear --warmup_ratio 0.1 --lambda_coef_similarity 0.01 --lambda_coef_l1 0.0 --lambda_coef_l2 0.0 --generate_logits_on_fly True --use_all_logits True --untrained_merged_model_name /home/ec2-user/shamane/DAM/merged_model  --combined_hf_dataset_dir arcee-train/my-combined-dataset --cache_dir /workspace/hf-cache --base_model_name mistralai/Mistral-7B-v0.1 --use_wandb True

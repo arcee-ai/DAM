@@ -33,7 +33,7 @@ def kl_divergence_loss(logits, target_logits, non_padded_tokens, temperature=1.0
     
     return normalized_kl_div
 
-def entropy_loss(logits, attention_mask, non_padded_tokens, temperature=1.0):
+def entropy_loss(logits, attention_mask, non_padded_tokens, temperature=1.0, lambda_coef_entropy=0.01):
     # Apply softmax to the logits
     probabilities = F.softmax(logits / temperature, dim=-1)
     
@@ -47,7 +47,7 @@ def entropy_loss(logits, attention_mask, non_padded_tokens, temperature=1.0):
     total_entropy_loss = masked_entropy.sum() * (temperature ** 2)
     
     # Normalize by the number of non-padded tokens
-    return total_entropy_loss / non_padded_tokens
+    return lambda_coef_entropy * total_entropy_loss / non_padded_tokens
 
 def mse_loss(logits, target_logits, non_padded_tokens, lambda_coef_mse=0.001):
     # Compute the MSE loss
@@ -61,8 +61,9 @@ class DAMTrainer(Trainer):
                  lambda_coef_similarity=0.01,  # Added similarity regularization coefficient
                  lambda_coef_l1=0,  # Added L1 regularization coefficient
                  lambda_coef_l2=0,  # Added L2 regularization coefficient
-                 lambda_coef_overlap=0,  # Added overlap regularization coefficient
+                 lambda_coef_overlap=0.001,  # Added overlap regularization coefficient
                  lambda_coef_mse=1.0,  # Added MSE regularization coefficient
+                 lambda_coef_entropy=0.01,  # Added entropy regularization coefficient
                  temperature=2.0, 
                  loss_fns=None,
                  base_model_path=None, 
@@ -76,6 +77,7 @@ class DAMTrainer(Trainer):
         self.lambda_coef_l2 = lambda_coef_l2  # Initialize L2 regularization coefficient
         self.lambda_coef_overlap = lambda_coef_overlap
         self.lambda_coef_mse = lambda_coef_mse
+        self.lambda_coef_entropy = lambda_coef_entropy
         self.temperature = temperature
         self.use_all_logits = use_all_logits
 
@@ -114,7 +116,8 @@ class DAMTrainer(Trainer):
             e_loss = entropy_loss(masked_merged_logits, 
                                   attention_mask, 
                                   non_padded_tokens,
-                                  temperature=self.temperature)
+                                  temperature=self.temperature,
+                                  lambda_coef_entropy=self.lambda_coef_entropy)
             loss_logs[f'entropy_loss_{dataple_id}'] = e_loss
             total_loss += e_loss
 
