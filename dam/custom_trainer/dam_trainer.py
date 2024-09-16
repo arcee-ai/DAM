@@ -59,11 +59,11 @@ def mse_loss(logits, target_logits, non_padded_tokens, lambda_coef_mse=0.001):
 class DAMTrainer(Trainer):
     def __init__(self, model, 
                  lambda_coef_similarity=0.01,  # Added similarity regularization coefficient
-                 lambda_coef_l1=0,  # Added L1 regularization coefficient
-                 lambda_coef_l2=0,  # Added L2 regularization coefficient
-                 lambda_coef_overlap=0.001,  # Added overlap regularization coefficient
+                 lambda_coef_l1=1e-6,  # Added L1 regularization coefficient
+                 lambda_coef_l2=1e-6,  # Added L2 regularization coefficient
+                 lambda_coef_overlap=1e-5,  # Added overlap regularization coefficient
                  lambda_coef_mse=1.0,  # Added MSE regularization coefficient
-                 lambda_coef_entropy=0.01,  # Added entropy regularization coefficient
+                 lambda_coef_entropy=0.1,  # Added entropy regularization coefficient
                  temperature=2.0, 
                  loss_fns=None,
                  base_model_path=None, 
