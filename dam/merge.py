@@ -172,8 +172,6 @@ def merge_models(base_model_id,
     print(f"Total number of parameters: {num_params}")
     print(f"Total number of trainable parameters: {num_trainable_params}")
 
-    exit()
-
     print(f"Saving merged model to {output_path}")
     merged_model.save_pretrained(output_path)
     tokenizer.save_pretrained(output_path)
