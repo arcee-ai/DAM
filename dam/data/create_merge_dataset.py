@@ -149,5 +149,7 @@ def main(k, dataset_names, model_ids, base_model_name, cache_dir, compute_logits
 
 if __name__ == "__main__":
     main()
+    # Fischerboot/another-german-alpaca-dataset
+    # LEL-A/translated_german_alpaca
 
-#  python dam/data/create_merge_dataset.py  --dataset_names "lcw99/wikipedia-korean-20240501,arcee-train/transformed_pg_wikiSQL_dataset,LEL-A/translated_german_alpaca"   --model_ids "beomi/Llama-3-Open-Ko-8B,defog/llama-3-sqlcoder-8b,VAGOsolutions/Llama-3-SauerkrautLM-8b-Instruct" --base_model_name meta-llama/Meta-Llama-3-8B  --compute_logits True --dataset_id arcee-train/llama3-combined-dataset --example_count 1729 --max_length 2048 --add_top_k_logits  False
+#  python dam/data/create_merge_dataset.py  --dataset_names "lcw99/wikipedia-korean-20240501,arcee-train/transformed_pg_wikiSQL_dataset,Fischerboot/another-german-alpaca-dataset"   --model_ids "beomi/Llama-3-Open-Ko-8B,defog/llama-3-sqlcoder-8b,VAGOsolutions/Llama-3-SauerkrautLM-8b-Instruct" --base_model_name meta-llama/Meta-Llama-3-8B  --compute_logits True --dataset_id arcee-train/llama3-combined-dataset --example_count 1729 --max_length 2048 --add_top_k_logits  False
