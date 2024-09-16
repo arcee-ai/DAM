@@ -82,7 +82,7 @@ def compute_and_save_topk_logits(models_dict, tokenized_dataset, device, batch_s
 @click.option("--dataset_names", type=str, default="p1atdev/ichikara-instruction:20231115-1,microsoft/orca-math-word-problems-200k,meta-math/MetaMathQA", help="Comma-separated list of dataset names to load.")
 @click.option("--model_ids", type=str, default="augmxnt/shisa-gamma-7b-v1,WizardLM/WizardMath-7B-V1.1,arcee-train/Abel-7B-002-truncated-embeds", help="Comma-separated list of model IDs to load.")
 @click.option("--base_model_name", type=str, default="mistralai/Mistral-7B-v0.1", help="Base model name.")
-@click.option("--cache_dir", type=str, default="/home/ec2-user/.cache/huggingface", help="Cache directory.")
+@click.option("--cache_dir", type=str, default="/Users/gayalshamane/.cache/huggingface", help="Cache directory.")
 @click.option("--compute_logits", type=bool, default=True, help="Whether to compute logits or just keep input_ids.")
 @click.option("--dataset_id", type=str, default="arcee-train/my-combined-dataset", help="Dataset ID to push to Hugging Face Hub.")
 @click.option("--base_model_dataset_name", type=str, default=None, help="Sample dataset name related to the base model.")
@@ -99,7 +99,7 @@ def main(k, dataset_names, model_ids, base_model_name, cache_dir, compute_logits
     # Convert comma-separated strings to lists
     dataset_names = dataset_names.split(',')
     model_ids = model_ids.split(',')
-    
+   
     # Load and template the datasets
     templated_datasets = setup_datasets_and_templates(tokenizer, dataset_names, example_count=example_count, seed=seed)
 
@@ -149,3 +149,5 @@ def main(k, dataset_names, model_ids, base_model_name, cache_dir, compute_logits
 
 if __name__ == "__main__":
     main()
+
+#  python dam/data/create_merge_dataset.py  --dataset_names "lcw99/wikipedia-korean-20240501,arcee-train/transformed_pg_wikiSQL_dataset,LEL-A/translated_german_alpaca"   --model_ids "beomi/Llama-3-Open-Ko-8B,defog/llama-3-sqlcoder-8b,VAGOsolutions/Llama-3-SauerkrautLM-8b-Instruct" --base_model_name meta-llama/Meta-Llama-3-8B  --compute_logits True --dataset_id arcee-train/llama3-combined-dataset --example_count 1729 --max_length 2048 --add_top_k_logits  False

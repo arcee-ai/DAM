@@ -31,7 +31,7 @@ def setup_datasets_and_templates(tokenizer, dataset_names, example_count=None, s
     # Function to determine the user input and assistant output columns dynamically
     def determine_columns(dataset):
         possible_input_columns = ['instruction', 'question', 'query', 'text']
-        possible_output_columns = ['output', 'answer', 'response']
+        possible_output_columns = ['output', 'answer', 'response', 'sql_query']
 
         input_column = None
         output_column = None
@@ -42,13 +42,13 @@ def setup_datasets_and_templates(tokenizer, dataset_names, example_count=None, s
             if output_column is None and col in possible_output_columns:
                 output_column = col
 
-            if input_column and output_column:
+            if input_column and output_column is not None:  # Allow output_column to be None
                 break
-
-        if not input_column or not output_column:
-            raise ValueError("Could not determine the appropriate input/output columns for the dataset.")
-
-        return input_column, output_column
+    
+        if not input_column:
+            raise ValueError("Could not determine the appropriate input column for the dataset.")
+        
+        return input_column, output_column  # It's okay for output_column to be None
 
     # Load and process datasets
     templated_datasets = []
@@ -59,6 +59,8 @@ def setup_datasets_and_templates(tokenizer, dataset_names, example_count=None, s
             dataset = load_dataset(base_name, config_version)
         else:
             dataset = load_dataset(dataset_name)
+            print(dataset)
+        
         # Select examples if example_count is provided
         if example_count:
             dataset = select_examples(dataset, example_count)
@@ -69,10 +71,13 @@ def setup_datasets_and_templates(tokenizer, dataset_names, example_count=None, s
         # Determine the input and output columns
         input_column, output_column = determine_columns(dataset)
 
-        # Apply templates
-        templated_dataset = dataset.map(lambda row: {'text': tokenizer.apply_chat_template(
-            [{'role': 'user', 'content': row[input_column]}, {'role': 'assistant', 'content': row[output_column]}], 
-            tokenize=False).strip()})
+        # Apply templates only if output_column is not None
+        if output_column is not None:
+            templated_dataset = dataset.map(lambda row: {'text': tokenizer.apply_chat_template(
+                [{'role': 'user', 'content': row[input_column]}, {'role': 'assistant', 'content': row[output_column]}], 
+                tokenize=False).strip()})
+        else:
+            templated_dataset = dataset  # Do not apply template if output_column is None
 
         templated_datasets.append(templated_dataset)
 
