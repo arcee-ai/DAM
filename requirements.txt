@@ -6,4 +6,6 @@ accelerate
 peft
 hf_transfer
 matplotlib
-flash-attn --no-build-isolation
+huggingface
+wandb
+click
