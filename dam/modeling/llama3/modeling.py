@@ -29,7 +29,7 @@ from  transformers.utils import (
     logging,
     replace_return_docstrings,
 )
-from .configuration_llama import MergedLlamaConfig
+from .config import MergedLlamaConfig
 from ..dam import DAMLinearLayer, DAMRMSNorm, DAMEmbeddingLayer
 
 logger = logging.get_logger(__name__)
