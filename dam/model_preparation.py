@@ -1,10 +1,18 @@
 import torch
 import gc
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
+from modeling.mistral.config import MergedMistralConfig
 from modeling.mistral.modeling import MergedMistralForCausalLM
+from modeling.llama3.config import MergedLlamaConfig
+from modeling.llama3.modeling import MergedLlamaForCausalLM
 from glom import glom, Assign
 from modeling.dam import DAMLinearLayer
 from utils import find_linear_layers, find_embedding_layers
+
+AutoConfig.register("mergedmistral", MergedMistralConfig)
+AutoConfig.register("mergedllama", MergedLlamaConfig)
+AutoModelForCausalLM.register(MergedMistralConfig, MergedMistralForCausalLM)
+AutoModelForCausalLM.register(MergedLlamaConfig, MergedLlamaForCausalLM)
 
 def print_trainable_parameters(model):
     """
@@ -46,7 +54,7 @@ def freeze_except_mergers(model):
     
 def prepare_model(model_name, cache_dir):
     print(f"Loading model from {model_name} with cache dir {cache_dir}")
-    merged_model = MergedMistralForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, device_map="auto", cache_dir=cache_dir)
+    merged_model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.bfloat16, device_map="auto", cache_dir=cache_dir)
     print_trainable_parameters(merged_model)
     # We do not need this anymore since we freeze the params during the merging.
     #freeze_except_mergers(merged_model)
