@@ -204,6 +204,9 @@ class DAMTrainer(Trainer):
                 ).to(l1_l2_reg.device)
             if hasattr(module, 'compute_mergers_overlap') and self.loss_fns['overlap']:
                 overlap_loss += module.compute_mergers_overlap(lambda_coef_overlap=self.lambda_coef_overlap).to(similarity_loss.device)
+            if hasattr(module, 'compute_weighted_overlap') and self.loss_fns['weighted_overlap']:
+                overlap_loss += module.compute_weighted_overlap(lambda_coef_overlap=self.lambda_coef_overlap).to(similarity_loss.device)
+
 
         total_loss += similarity_loss + l1_l2_reg + overlap_loss
         all_loss_logs['similarity_loss'] = similarity_loss
