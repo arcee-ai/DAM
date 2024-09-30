@@ -44,6 +44,8 @@ class DAMBaseLayer(nn.Module):
             torch.ones(in_features, dtype=dtype) * init_merger_values[i],
             requires_grad=use_in_merging  # Set requires_grad based on merging
         ) for i in range(num_models)])
+        
+        self.register_buffer('similarity_weightings', torch.zeros(3, in_features))#torch.zeros((in_features * (in_features - 1)) // 2))
 
     def compute_mergers_overlap(self, lambda_coef_overlap=0.000001):
         # Check if any merger requires gradient
@@ -97,6 +99,18 @@ class DAMBaseLayer(nn.Module):
             similarity_loss *= lambda_coef
     
         return similarity_loss
+    
+    def compute_weighted_overlap(self, lambda_coef_overlap=1):
+        merger_combinations = list(itertools.combinations([p for p in self.mergers], 2))
+        merger_tensor = torch.stack([torch.stack(pair) for pair in merger_combinations])
+
+        overlap = torch.min(torch.abs(merger_tensor), dim=1).values
+        weighted_overlap = overlap * self.similarity_weightings
+        
+        overlaps = torch.sum(weighted_overlap, dim=1)
+        
+        result = torch.mean(overlaps)
+        return result * lambda_coef_overlap
 
     # Method to compute L1 and L2 regularization on the merging coefficients
     def compute_mergers_L1_L2_reg(self, lambda_coef_l1=None, lambda_coef_l2=None):

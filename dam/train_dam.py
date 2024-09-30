@@ -40,6 +40,7 @@ os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 @click.option("--similarity", type=click.BOOL, default=True, help="Use similarity loss.")
 @click.option("--l1_l2_reg", type=click.BOOL, default=False, help="Use L1/L2 regularization.")
 @click.option("--overlap", type=click.BOOL, default=False, help="Use overlap loss.")
+@click.option("--weighted_overlap", type=click.BOOL, default=False, help="Use weighted overlap loss.")
 @click.option("--kl", type=click.BOOL, default=True, help="Use KL divergence loss.")
 @click.option("--mse", type=click.BOOL, default=False, help="Use MSE loss.")
 @click.option("--entropy", type=click.BOOL, default=False, help="Use entropy loss.")
@@ -48,7 +49,7 @@ def main(temperature, weight_decay, learning_rate,
          lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2, lambda_coef_entropy, lambda_coef_mse, lambda_coef_overlap,
          per_device_train_batch_size, gradient_accumulation_steps, use_wandb, generate_logits_on_fly, use_all_logits,
          untrained_merged_model_name, combined_hf_dataset_dir, cache_dir, base_model_name,
-         similarity, l1_l2_reg, overlap, kl, mse, entropy):
+         similarity, l1_l2_reg, overlap, weighted_overlap, kl, mse, entropy):
     cmd_args = locals().copy()
 
     # Model and dataset details
@@ -93,7 +94,8 @@ def main(temperature, weight_decay, learning_rate,
         "overlap": overlap,  
         "kl": kl, 
         "mse": mse, 
-        "entropy": entropy 
+        "entropy": entropy,
+        "weighted_overlap": weighted_overlap
         }
     
     # Initialize DAMTrainer
