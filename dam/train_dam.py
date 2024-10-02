@@ -44,12 +44,14 @@ os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 @click.option("--kl", type=click.BOOL, default=True, help="Use KL divergence loss.")
 @click.option("--mse", type=click.BOOL, default=False, help="Use MSE loss.")
 @click.option("--entropy", type=click.BOOL, default=False, help="Use entropy loss.")
+@click.option("--report_all_metrics", type=click.BOOL, default=False, help="Report all metrics.")
 def main(temperature, weight_decay, learning_rate, 
          lr_scheduler_type, warmup_ratio, mofo_alpha, 
          lambda_coef_similarity, lambda_coef_l1, lambda_coef_l2, lambda_coef_entropy, lambda_coef_mse, lambda_coef_overlap,
          per_device_train_batch_size, gradient_accumulation_steps, use_wandb, generate_logits_on_fly, use_all_logits,
          untrained_merged_model_name, combined_hf_dataset_dir, cache_dir, base_model_name,
-         similarity, l1_l2_reg, overlap, weighted_overlap, kl, mse, entropy):
+         similarity, l1_l2_reg, overlap, weighted_overlap, kl, mse, entropy,
+         report_all_metrics):
     cmd_args = locals().copy()
 
     # Model and dataset details
@@ -117,7 +119,8 @@ def main(temperature, weight_decay, learning_rate,
         generate_logits_on_fly=generate_logits_on_fly,
         use_all_logits=use_all_logits,
         use_wandb=use_wandb,
-        optimizers=(optimizer, None)
+        optimizers=(optimizer, None),
+        report_all_metrics=report_all_metrics
     )
 
     if use_wandb:
