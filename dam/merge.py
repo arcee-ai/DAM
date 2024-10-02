@@ -8,6 +8,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from glom import glom, Assign
 from tqdm import tqdm
 from huggingface_hub import HfApi
+from itertools import combinations
 
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 
@@ -36,6 +37,38 @@ def fix_config(save_path, num_models, non_linearity, merge_embedding_layers, mer
         json.dump(data, file, indent=2)
 
     return config_path  # Return the updated config
+
+def calculate_similarity_weightings(task_vectors, epsilon = 1e-8):
+    theta_list = []
+    
+    for (idx1, idx2) in combinations(range(len(task_vectors)), 2):
+        M1 = task_vectors[idx1]
+        M2 = task_vectors[idx2]
+    
+        # Compute dot products of corresponding columns
+        dot_products = torch.sum(M1 * M2, dim=0)  # Shape: [4096]
+    
+        # Compute norms of the columns
+        norms_M1 = torch.norm(M1, dim=0) + epsilon # Shape: [4096]
+        norms_M2 = torch.norm(M2, dim=0) + epsilon  # Shape: [4096]
+    
+        # Compute cosine of the angles
+        cos_theta = dot_products / (norms_M1 * norms_M2)
+    
+        # Clamp values to the valid range [-1, 1] to avoid numerical errors
+        cos_theta = torch.clamp(cos_theta, -1.0, 1.0)
+    
+        # Compute the angles in radians
+        theta = torch.acos(cos_theta)  # Shape: [4096]
+    
+        # Append the angles to the list
+        theta_list.append(theta)
+    
+    # Stack the angles into a tensor
+    thetas = torch.stack(theta_list)  # Shape: [3, 4096]
+    
+    # Now, angles_tensor[i] contains the angles for the ith pair of matrices
+    return torch.sin(2 * thetas).pow(2)
 
 def merge_models(base_model_id, 
                  model_ids, 
@@ -150,6 +183,12 @@ def merge_models(base_model_id,
             # If the layer has a bias, assign the bias from the current model's layer to the corresponding slot
             if module.bias is not None:
                 dam_linearlayer.biases[i].data = module.bias.data
+        
+        base_weight = glom(merged_model, m).weight.data
+        task_vectors = [module.weight.data - base_weight for module in modules]
+        similarity_weightings = calculate_similarity_weightings(task_vectors)
+
+        dam_linearlayer.similarity_weightings.data = similarity_weightings
 
         # Create an assignment operation to replace the original linear layer with the merged DAMLinearLayer
         assign = Assign(m, dam_linearlayer)
