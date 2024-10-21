@@ -9,7 +9,6 @@ from glom import glom, Assign
 from tqdm import tqdm
 from huggingface_hub import HfApi
 from itertools import combinations
-from safetensors.torch import load_model, save_model
 
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 
