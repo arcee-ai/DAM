@@ -85,11 +85,13 @@ python dam/train_dam.py --learning_rate 1e-3 --lambda_coef_similarity 0.01 --gen
 - `--base_model_name`: Name of the base model.
 
 ## Cite us ! 
+'''
 @article{gauthier2024merging,
   title={Merging in a Bottle: Differentiable Adaptive Merging (DAM) and the Path from Averaging to Automation},
   author={Gauthier-Caron, Thomas and Siriwardhana, Shamane and Stein, Elliot and Ehghaghi, Malikeh and Goddard, Charles and McQuade, Mark and Solawetz, Jacob and Labonne, Maxime},
   journal={arXiv preprint arXiv:2410.08371},
   year={2024}
 }
+'''
 
 
