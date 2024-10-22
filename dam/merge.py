@@ -212,8 +212,12 @@ def merge_models(base_model_id,
     print(f"Total number of trainable parameters: {num_trainable_params}")
 
     print(f"Saving merged model to {output_path}")
-    merged_model.save_pretrained(output_path)
-    tokenizer.save_pretrained(output_path)
+    if data['model_type'] == "mistral":
+        merged_model.save_pretrained(output_path)
+        tokenizer.save_pretrained(output_path)
+    elif data['model_type'] == "llama":
+        merged_model.save_pretrained(output_path, safe_serialization=False)
+    #Will need to expand with any additional model architecture compatibility updates
 
     fixed_config_path = fix_config(output_path, num_models=len(models), non_linearity=non_linearity, merge_embedding_layers=merge_embedding_layers, merge_layernorms=merge_layernorms, uses_base_model=use_base_model)
 
