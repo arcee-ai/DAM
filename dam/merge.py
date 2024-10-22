@@ -212,6 +212,11 @@ def merge_models(base_model_id,
     print(f"Total number of trainable parameters: {num_trainable_params}")
 
     print(f"Saving merged model to {output_path}")
+
+    config_path = os.path.join(output_path, 'config.json')
+    with open(config_path, 'r') as file:
+        data = json.load(file)
+                     
     if data['model_type'] == "mistral":
         merged_model.save_pretrained(output_path)
         tokenizer.save_pretrained(output_path)
