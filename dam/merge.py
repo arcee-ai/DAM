@@ -9,6 +9,7 @@ from glom import glom, Assign
 from tqdm import tqdm
 from huggingface_hub import HfApi
 from itertools import combinations
+from transformers import AutoConfig
 
 os.environ['HF_HUB_ENABLE_HF_TRANSFER'] = '1'
 
@@ -213,14 +214,15 @@ def merge_models(base_model_id,
 
     print(f"Saving merged model to {output_path}")
 
-    config_path = os.path.join(output_path, 'config.json')
-    with open(config_path, 'r') as file:
-        data = json.load(file)
+    # Load model configuration from the Hugging Face Hub and check if it's a mistral or llama model
+    config = AutoConfig.from_pretrained(base_model_id)
+    model_type = config.model_type
+    print("Model type is: ", model_type)
                      
-    if data['model_type'] == "mistral":
+    if model_type == "mistral":
         merged_model.save_pretrained(output_path)
         tokenizer.save_pretrained(output_path)
-    elif data['model_type'] == "llama":
+    elif model_type == "llama":
         merged_model.save_pretrained(output_path, safe_serialization=False)
     #Will need to expand with any additional model architecture compatibility updates
 
