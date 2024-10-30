@@ -129,7 +129,7 @@ class DAMTrainer(Trainer):
 
         return total_loss, loss_logs
 
-    def compute_loss(self, merged_model, inputs, return_outputs=False):
+    def compute_loss(self, merged_model, inputs, return_outputs=False, num_items_in_batch=None):
         # Ensure the merged_model is on the correct device
         device = merged_model.device
         
@@ -165,7 +165,8 @@ class DAMTrainer(Trainer):
                 input_ids = input_ids_dict[f'input_ids_{model_index + 1}']
                 attention_mask = attention_mask_dict[f'attention_mask_{model_index + 1}']
                 with torch.no_grad():
-                    model_logits = merged_model(input_ids=input_ids.cpu(), attention_mask=attention_mask.cpu()).logits
+                    # device = merged_model.get_input_embeddings().device
+                    model_logits = merged_model(input_ids=input_ids, attention_mask=attention_mask).logits
                 individual_logits_dict[model_index] = model_logits.to(device)
             
             # Reset model_index to None after computing logits for individual models

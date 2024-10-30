@@ -212,7 +212,11 @@ def merge_models(base_model_id,
     print(f"Total number of trainable parameters: {num_trainable_params}")
 
     print(f"Saving merged model to {output_path}")
-    merged_model.save_pretrained(output_path)
+
+    # Safetensors saving does not work when model has shared tensors, see https://huggingface.co/docs/safetensors/torch_shared_tensors
+    safe_serialization = not merged_model.config.tie_word_embeddings
+
+    merged_model.save_pretrained(output_path, safe_serialization=safe_serialization)
     tokenizer.save_pretrained(output_path)
 
     fixed_config_path = fix_config(output_path, num_models=len(models), non_linearity=non_linearity, merge_embedding_layers=merge_embedding_layers, merge_layernorms=merge_layernorms, uses_base_model=use_base_model)

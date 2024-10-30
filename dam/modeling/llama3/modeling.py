@@ -1119,6 +1119,12 @@ class MergedLlamaForCausalLM(MergedLlamaPreTrainedModel):
     def get_decoder(self):
         return self.model
 
+    def tie_weights(self):
+        if isinstance(self.get_input_embeddings(), DAMEmbeddingLayer) and isinstance(self.lm_head, DAMLinearLayer):
+            self.lm_head.tie_with_embeddings(self.get_input_embeddings())
+        else:
+            super().tie_weights()
+            
     @add_start_docstrings_to_model_forward(LLAMA_INPUTS_DOCSTRING)
     @replace_return_docstrings(output_type=CausalLMOutputWithPast, config_class=_CONFIG_FOR_DOC)
     def forward(

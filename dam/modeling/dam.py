@@ -1,4 +1,5 @@
 import torch
+import math
 from torch import nn, Tensor
 import torch.nn.functional as F
 from typing import Optional, Union
@@ -45,7 +46,7 @@ class DAMBaseLayer(nn.Module):
             requires_grad=use_in_merging  # Set requires_grad based on merging
         ) for i in range(num_models)])
         
-        self.register_buffer('similarity_weightings', torch.zeros(3, in_features))#torch.zeros((in_features * (in_features - 1)) // 2))
+        self.register_buffer('similarity_weightings', torch.zeros(math.comb(num_models, 2), in_features))
 
     def compute_mergers_overlap(self, lambda_coef_overlap=0.000001):
         # Check if any merger requires gradient
@@ -144,77 +145,6 @@ class DAMBaseLayer(nn.Module):
         else:
             return tensor  # If non_linearity is None or unsupported, return the tensor as is
 
-# Specialized class for a linear layer that uses the DAMBaseLayer
-class DAMLinearLayer(DAMBaseLayer):
-    def __init__(
-        self,
-        in_features: int,
-        out_features: int,
-        num_models=3,
-        bias: bool=False,
-        init_merger_values=[],
-        dtype=None,
-        non_linearity: str = 'tanh',  # Option to apply non-linearity   
-        model_index: Optional[int] = None,
-        use_random_init: bool = False,  # Flag to indicate if random initialization should be used
-        use_in_merging: bool = True,  # Flag to indicate if this layer should be used in merging
-    ):
-        super().__init__(
-            in_features=in_features,
-            out_features=out_features,
-            num_models=num_models,
-            init_merger_values=init_merger_values,
-            dtype=dtype,
-            non_linearity=non_linearity,
-            model_index=model_index,
-            is_embedding=False,  # This is not an embedding layer
-            use_random_init=use_random_init,  # Pass the flag to the base class
-            use_in_merging=use_in_merging,  # Pass the flag to the base class
-        )
-
-        # Initialize the list of weights for each model's layer
-        self.weights = nn.ParameterList([Parameter(
-            torch.zeros(out_features, in_features, dtype=dtype),
-            requires_grad=False  # Freeze weights
-        ) for i in range(num_models)])
-
-        # If the layer has a bias, initialize the list of biases and bias mergers for each model
-        if bias:
-            self.biases = nn.ParameterList([nn.Parameter(torch.zeros(out_features, dtype=dtype), requires_grad=False) for i in range(num_models)])
-            self.bias_mergers = nn.ParameterList([nn.Parameter(torch.ones(1, dtype=dtype), requires_grad=use_in_merging) for i in range(num_models)])
-
-    # Method to compute the combined weight for the merged layer
-    def get_dam_weight(self):
-        device = self.mergers[0].device
-        constrained_mergers = [self.apply_non_linearity(merger) for merger in self.mergers] if self.non_linearity else self.mergers
-        # Sum the weighted contributions of each model's weight using the (possibly constrained) merging coefficients
-        return sum(merger.to(device) * weight.to(device) for merger, weight in zip(constrained_mergers, self.weights))
-    
-    # Method to compute the combined bias for the merged layer (if bias is used)
-    def get_dam_bias(self):
-        if hasattr(self, 'biases'):
-            device = self.bias_mergers[0].device
-            constrained_bias_mergers = [self.apply_non_linearity(merger) for merger in self.bias_mergers] if self.non_linearity else self.bias_mergers
-            # Sum the weighted contributions of each model's bias using the (possibly constrained) bias merging coefficients
-            return sum(merger.to(device) * bias.to(device) for merger, bias in zip(constrained_bias_mergers, self.biases))
-        return None
-
-    # Forward pass through the DAMLinearLayer
-    def forward(self, hidden_states: torch.Tensor) -> Union[torch.Tensor, list]:
-        if self.model_index is not None:
-            # Return the output from the specified model without merging
-            weight = self.weights[self.model_index].to(hidden_states.device)
-            bias = self.biases[self.model_index].to(hidden_states.device) if hasattr(self, 'biases') else None
-            return F.linear(hidden_states, weight=weight, bias=bias)
-        else:
-            # Ensure the weights are on the same device as the input tensor
-            weight = self.get_dam_weight().to(hidden_states.device)
-            # Ensure the bias (if any) is on the same device as the input tensor
-            bias = self.get_dam_bias().to(hidden_states.device) if self.get_dam_bias() is not None else None
-
-            # Perform the linear transformation using the merged weight and bias
-            return F.linear(hidden_states, weight=weight, bias=bias)
-
 # Specialized class for an embedding layer that uses the DAMBaseLayer
 class DAMEmbeddingLayer(DAMBaseLayer):
     def __init__(
@@ -267,6 +197,86 @@ class DAMEmbeddingLayer(DAMBaseLayer):
             embedding = self.get_dam_embedding().to(input_ids.device)
             # Perform the embedding lookup using the merged embedding
             return F.embedding(input_ids, embedding)
+
+
+# Specialized class for a linear layer that uses the DAMBaseLayer
+class DAMLinearLayer(DAMBaseLayer):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        num_models=3,
+        bias: bool=False,
+        init_merger_values=[],
+        dtype=None,
+        non_linearity: str = 'tanh',  # Option to apply non-linearity   
+        model_index: Optional[int] = None,
+        use_random_init: bool = False,  # Flag to indicate if random initialization should be used
+        use_in_merging: bool = True,  # Flag to indicate if this layer should be used in merging
+    ):
+        super().__init__(
+            in_features=in_features,
+            out_features=out_features,
+            num_models=num_models,
+            init_merger_values=init_merger_values,
+            dtype=dtype,
+            non_linearity=non_linearity,
+            model_index=model_index,
+            is_embedding=False,  # This is not an embedding layer
+            use_random_init=use_random_init,  # Pass the flag to the base class
+            use_in_merging=use_in_merging,  # Pass the flag to the base class
+        )
+
+        # Initialize the list of weights for each model's layer
+        self.weights = nn.ParameterList([Parameter(
+            torch.zeros(out_features, in_features, dtype=dtype),
+            requires_grad=False  # Freeze weights
+        ) for i in range(num_models)])
+
+        self.embedding_ties = None
+
+        # If the layer has a bias, initialize the list of biases and bias mergers for each model
+        if bias:
+            self.biases = nn.ParameterList([nn.Parameter(torch.zeros(out_features, dtype=dtype), requires_grad=False) for i in range(num_models)])
+            self.bias_mergers = nn.ParameterList([nn.Parameter(torch.ones(1, dtype=dtype), requires_grad=use_in_merging) for i in range(num_models)])
+
+    # Method to compute the combined weight for the merged layer
+    def get_dam_weight(self):
+        if self.embedding_ties is not None:
+            return self.embedding_ties.get_dam_embedding()
+            
+        device = self.mergers[0].device
+        constrained_mergers = [self.apply_non_linearity(merger) for merger in self.mergers] if self.non_linearity else self.mergers
+        # Sum the weighted contributions of each model's weight using the (possibly constrained) merging coefficients
+        return sum(merger.to(device) * weight.to(device) for merger, weight in zip(constrained_mergers, self.weights))
+
+    def tie_with_embeddings(self, embeddings: DAMEmbeddingLayer):
+        self.embedding_ties = embeddings
+    
+    # Method to compute the combined bias for the merged layer (if bias is used)
+    def get_dam_bias(self):
+        if hasattr(self, 'biases'):
+            device = self.bias_mergers[0].device
+            constrained_bias_mergers = [self.apply_non_linearity(merger) for merger in self.bias_mergers] if self.non_linearity else self.bias_mergers
+            # Sum the weighted contributions of each model's bias using the (possibly constrained) bias merging coefficients
+            return sum(merger.to(device) * bias.to(device) for merger, bias in zip(constrained_bias_mergers, self.biases))
+        return None
+
+    # Forward pass through the DAMLinearLayer
+    def forward(self, hidden_states: torch.Tensor) -> Union[torch.Tensor, list]:
+        if self.model_index is not None:
+            # Return the output from the specified model without merging
+            weight = self.weights[self.model_index].to(hidden_states.device)
+            bias = self.biases[self.model_index].to(hidden_states.device) if hasattr(self, 'biases') else None
+            return F.linear(hidden_states, weight=weight, bias=bias)
+        else:
+            # Ensure the weights are on the same device as the input tensor
+            weight = self.get_dam_weight().to(hidden_states.device)
+            # Ensure the bias (if any) is on the same device as the input tensor
+            bias = self.get_dam_bias().to(hidden_states.device) if self.get_dam_bias() is not None else None
+
+            # Perform the linear transformation using the merged weight and bias
+            return F.linear(hidden_states, weight=weight, bias=bias)
 
 # Specialized class for a layer normalization that uses the DAMBaseLayer
 class DAMRMSNorm(DAMBaseLayer):
