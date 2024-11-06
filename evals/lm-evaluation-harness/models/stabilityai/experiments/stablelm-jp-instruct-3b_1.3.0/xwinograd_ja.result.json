@@ -1,0 +1,22 @@
+{
+  "results": {
+    "xwinograd_ja": {
+      "acc": 0.6861313868613139,
+      "acc_stderr": 0.014993217214723978
+    }
+  },
+  "versions": {
+    "xwinograd_ja": 1.0
+  },
+  "config": {
+    "model": "hf-causal",
+    "model_args": "pretrained=sft/models/stablelm-jp-instruct-3b_1.3.0/,tokenizer=tokenizers/nai-hf-tokenizer/,use_fast=False",
+    "num_fewshot": 0,
+    "batch_size": null,
+    "device": "cuda",
+    "no_cache": true,
+    "limit": null,
+    "bootstrap_iters": 100000,
+    "description_dict": {}
+  }
+}

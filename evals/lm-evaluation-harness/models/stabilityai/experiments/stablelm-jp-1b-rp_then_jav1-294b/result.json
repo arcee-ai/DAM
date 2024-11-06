@@ -1,0 +1,71 @@
+{
+  "results": {
+    "jcommonsenseqa-1.1-0.2": {
+      "acc": 0.2680965147453083,
+      "acc_stderr": 0.013248038756079302,
+      "acc_norm": 0.24039320822162646,
+      "acc_norm_stderr": 0.012780110667692907
+    },
+    "jnli-1.1-0.2": {
+      "acc": 0.3278553820870994,
+      "acc_stderr": 0.009517030628219573,
+      "acc_norm": 0.31183237469186526,
+      "acc_norm_stderr": 0.009391536814742456
+    },
+    "marc_ja-1.1-0.2": {
+      "acc": 0.7771189396581792,
+      "acc_stderr": 0.005496539565709208,
+      "acc_norm": 0.7771189396581792,
+      "acc_norm_stderr": 0.005496539565709208
+    },
+    "xwinograd_ja": {
+      "acc": 0.6861313868613139,
+      "acc_stderr": 0.01499321721472398
+    },
+    "jsquad-1.1-0.2": {
+      "exact_match": 54.02971634398919,
+      "f1": 64.2854711987419
+    },
+    "jaqket_v2-0.1-0.2": {
+      "exact_match": 59.450171821305844,
+      "f1": 65.37892424490362
+    },
+    "xlsum_ja": {
+      "rouge2": 9.662662093427816
+    },
+    "mgsm": {
+      "acc": 0.008,
+      "acc_stderr": 0.0056454836766901585
+    }
+  },
+  "versions": {
+    "jcommonsenseqa-1.1-0.2": 1.1,
+    "jnli-1.1-0.2": 1.1,
+    "marc_ja-1.1-0.2": 1.1,
+    "jsquad-1.1-0.2": 1.1,
+    "jaqket_v2-0.1-0.2": 0.1,
+    "xlsum_ja": 1.0,
+    "xwinograd_ja": 1.0,
+    "mgsm": 1.0
+  },
+  "config": {
+    "model": "hf-causal",
+    "model_args": "pretrained=${PROJECT_DIR}/hf_model/1b-rp_then_jav1-294b,tokenizer=${PROJECT_DIR}/tokenizers/nai-hf-tokenizer/,use_fast=False",
+    "num_fewshot": [
+      3,
+      3,
+      3,
+      2,
+      1,
+      1,
+      0,
+      5
+    ],
+    "batch_size": null,
+    "device": "cuda",
+    "no_cache": false,
+    "limit": null,
+    "bootstrap_iters": 100000,
+    "description_dict": {}
+  }
+}

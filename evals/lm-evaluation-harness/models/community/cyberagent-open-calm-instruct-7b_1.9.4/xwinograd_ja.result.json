@@ -1,0 +1,22 @@
+{
+  "results": {
+    "xwinograd_ja": {
+      "acc": 0.6517205422314911,
+      "acc_stderr": 0.015392596336826887
+    }
+  },
+  "versions": {
+    "xwinograd_ja": 1.0
+  },
+  "config": {
+    "model": "hf-causal",
+    "model_args": "pretrained=sft/checkpoints/open-calm-instruct-7b_1.9.4/,tokenizer=cyberagent/open-calm-7b",
+    "num_fewshot": 0,
+    "batch_size": null,
+    "device": "cuda",
+    "no_cache": false,
+    "limit": null,
+    "bootstrap_iters": 100000,
+    "description_dict": {}
+  }
+}

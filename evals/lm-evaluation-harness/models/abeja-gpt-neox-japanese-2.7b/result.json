@@ -1,0 +1,59 @@
+{
+  "results": {
+    "jcommonsenseqa-1.1-0.2": {
+      "acc": 0.20017873100983022,
+      "acc_stderr": 0.011966979264632673,
+      "acc_norm": 0.22609472743521,
+      "acc_norm_stderr": 0.012510314229861862
+    },
+    "jnli-1.1-0.2": {
+      "acc": 0.3972884141331142,
+      "acc_stderr": 0.009920570907906705,
+      "acc_norm": 0.34798685291700904,
+      "acc_norm_stderr": 0.009656917922100158
+    },
+    "marc_ja-1.1-0.2": {
+      "acc": 0.749912800837112,
+      "acc_stderr": 0.005719527388015089,
+      "acc_norm": 0.749912800837112,
+      "acc_norm_stderr": 0.005719527388015089
+    },
+    "jsquad-1.1-0.2": {
+      "exact_match": 13.665015758667266,
+      "f1": 22.909453892411364
+    },
+    "xlsum_ja": {
+      "rouge2": 6.149952794206885
+    },
+    "xwinograd_ja": {
+      "acc": 0.6037539103232534,
+      "acc_stderr": 0.01580264261655725
+    }
+  },
+  "versions": {
+    "jcommonsenseqa-1.1-0.2": 1.1,
+    "jnli-1.1-0.2": 1.1,
+    "jsquad-1.1-0.2": 1.1,
+    "marc_ja-1.1-0.2": 1.1,
+    "xlsum_ja": 1.0,
+    "xwinograd_ja": 1.0
+  },
+  "config": {
+    "model": "hf-causal",
+    "model_args": "pretrained=abeja/gpt-neox-japanese-2.7b",
+    "num_fewshot": [
+      2,
+      3,
+      3,
+      3,
+      1,
+      0
+    ],
+    "batch_size": null,
+    "device": "cuda",
+    "no_cache": false,
+    "limit": null,
+    "bootstrap_iters": 100000,
+    "description_dict": {}
+  }
+}

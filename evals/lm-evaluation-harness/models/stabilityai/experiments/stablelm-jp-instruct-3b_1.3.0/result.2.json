@@ -1,0 +1,35 @@
+{
+  "results": {
+    "jaqket_v2-0.1-0.3": {
+      "exact_match": 46.56357388316151,
+      "f1": 51.1525974025974
+    },
+    "xlsum_ja-1.0-0.3": {
+      "rouge2": 5.779891711271447
+    },
+    "mgsm-1.0-0.3": {
+      "acc": 0.024,
+      "acc_stderr": 0.009699087026964235
+    }
+  },
+  "versions": {
+    "jaqket_v2-0.1-0.3": 0.1,
+    "xlsum_ja-1.0-0.3": 1.0,
+    "mgsm-1.0-0.3": 1.0
+  },
+  "config": {
+    "model": "hf-causal",
+    "model_args": "pretrained=sft/models/stablelm-jp-instruct-3b_1.3.0/,tokenizer=tokenizers/nai-hf-tokenizer/,use_fast=False",
+    "num_fewshot": [
+      1,
+      1,
+      4
+    ],
+    "batch_size": null,
+    "device": "cuda",
+    "no_cache": true,
+    "limit": null,
+    "bootstrap_iters": 100000,
+    "description_dict": {}
+  }
+}

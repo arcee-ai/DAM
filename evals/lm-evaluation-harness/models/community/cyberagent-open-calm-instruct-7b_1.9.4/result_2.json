@@ -1,0 +1,35 @@
+{
+  "results": {
+    "jaqket_v2-0.1-0.3": {
+      "exact_match": 40.292096219931274,
+      "f1": 45.46446299023617
+    },
+    "xlsum_ja-1.0-0.3": {
+      "rouge2": 1.0537473567422466
+    },
+    "mgsm-1.0-0.3": {
+      "acc": 0.012,
+      "acc_stderr": 0.006900323023694277
+    }
+  },
+  "versions": {
+    "jaqket_v2-0.1-0.3": 0.1,
+    "xlsum_ja-1.0-0.3": 1.0,
+    "mgsm-1.0-0.3": 1.0
+  },
+  "config": {
+    "model": "hf-causal",
+    "model_args": "pretrained=sft/checkpoints/open-calm-instruct-7b_1.9.4/,tokenizer=cyberagent/open-calm-7b",
+    "num_fewshot": [
+      1,
+      1,
+      4
+    ],
+    "batch_size": null,
+    "device": "cuda",
+    "no_cache": false,
+    "limit": null,
+    "bootstrap_iters": 100000,
+    "description_dict": {}
+  }
+}

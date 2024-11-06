@@ -1,0 +1,59 @@
+{
+  "results": {
+    "jcommonsenseqa-1.1-0.2": {
+      "acc": 0.39499553172475427,
+      "acc_stderr": 0.0146202392872941,
+      "acc_norm": 0.2868632707774799,
+      "acc_norm_stderr": 0.013527046208250626
+    },
+    "jnli-1.1-0.2": {
+      "acc": 0.4231717337715694,
+      "acc_stderr": 0.010016374130527417,
+      "acc_norm": 0.3972884141331142,
+      "acc_norm_stderr": 0.009920570907906705
+    },
+    "marc_ja-1.1-0.2": {
+      "acc": 0.8357167771189397,
+      "acc_stderr": 0.004893675823612713,
+      "acc_norm": 0.8357167771189397,
+      "acc_norm_stderr": 0.004893675823612713
+    },
+    "jsquad-1.1-0.2": {
+      "exact_match": 28.725799189554255,
+      "f1": 39.80333448254385
+    },
+    "xlsum_ja": {
+      "rouge2": 2.5775988917922406
+    },
+    "xwinograd_ja": {
+      "acc": 0.5964546402502607,
+      "acc_stderr": 0.015850834635341565
+    }
+  },
+  "versions": {
+    "jcommonsenseqa-1.1-0.2": 1.1,
+    "jnli-1.1-0.2": 1.1,
+    "jsquad-1.1-0.2": 1.1,
+    "marc_ja-1.1-0.2": 1.1,
+    "xlsum_ja": 1.0,
+    "xwinograd_ja": 1.0
+  },
+  "config": {
+    "model": "hf-causal",
+    "model_args": "pretrained=cyberagent/open-calm-medium,use_fast=True",
+    "num_fewshot": [
+      2,
+      3,
+      3,
+      3,
+      1,
+      0
+    ],
+    "batch_size": null,
+    "device": "cuda",
+    "no_cache": false,
+    "limit": null,
+    "bootstrap_iters": 100000,
+    "description_dict": {}
+  }
+}
